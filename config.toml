@@ -1,0 +1,4 @@
+[ticketmaster]
+delay_ms = 500
+geo_point = "c22zp"  # Seattle
+timeout_seconds = 15
