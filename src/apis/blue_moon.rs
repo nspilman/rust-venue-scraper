@@ -20,7 +20,7 @@ impl BlueMoonCrawler {
 #[async_trait::async_trait]
 impl EventApi for BlueMoonCrawler {
     fn api_name(&self) -> &'static str {
-        "crawler_blue_moon"
+        "blue_moon"
     }
 
     fn has_venues(&self) -> bool {

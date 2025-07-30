@@ -4,6 +4,7 @@ use tracing::{info, warn, error, debug};
 mod apis;
 mod carpenter;
 mod config;
+mod constants;
 mod error;
 mod logging;
 mod pipeline;
@@ -53,9 +54,9 @@ enum Commands {
 }
 
 fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
-    match api_name {
-        "blue_moon" => Some(Box::new(BlueMoonCrawler::new())),
-        "sea_monster" => Some(Box::new(SeaMonsterCrawler::new())),
+match api_name {
+        constants::BLUE_MOON_API => Some(Box::new(BlueMoonCrawler::new())),
+        constants::SEA_MONSTER_API => Some(Box::new(SeaMonsterCrawler::new())),
         _ => None,
     }
 }
@@ -113,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let api_names = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
             } else {
-                vec!["blue_moon".to_string()] // Default
+                vec![constants::BLUE_MOON_API.to_string()] // Default
             };
             
             let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
@@ -124,13 +125,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let api_names = if let Some(api_list) = apis {
                 // Convert user-friendly API names to internal names
-                let mapped_names: Vec<String> = api_list.split(',')
+let mapped_names: Vec<String> = api_list.split(',')
                     .map(|s| s.trim())
-                    .map(|name| match name {
-                        "blue_moon" => "crawler_blue_moon".to_string(),
-                        "sea_monster" => "crawler_sea_monster_lounge".to_string(),
-                        other => other.to_string(),
-                    })
+                    .map(constants::api_name_to_internal)
                     .collect();
                 Some(mapped_names)
             } else {
@@ -156,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let api_names = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
             } else {
-                vec!["blue_moon".to_string()] // Default
+                vec![constants::BLUE_MOON_API.to_string()] // Default
             };
             
             let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
@@ -170,12 +167,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let carpenter = Carpenter::new(storage);
             
             // Convert api names to the format expected by carpenter
-            let carpenter_api_names: Vec<String> = api_names.iter()
-                .map(|name| match name.as_str() {
-                    "blue_moon" => "crawler_blue_moon".to_string(),
-                    "sea_monster" => "crawler_sea_monster_lounge".to_string(),
-                    other => other.to_string(),
-                })
+let carpenter_api_names: Vec<String> = api_names.iter()
+                .map(|name| constants::api_name_to_internal(name))
                 .collect();
             
             match carpenter.run(Some(carpenter_api_names), None, false).await {

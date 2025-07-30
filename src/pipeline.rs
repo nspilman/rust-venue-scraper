@@ -172,6 +172,8 @@ impl Pipeline {
         info!("💾 Saving raw data to storage...");
         for processed_event in &processed_events {
             let mut raw_data = RawData::from_processed_event(processed_event);
+            // Map API names to the format expected by carpenter
+            raw_data.api_name = crate::constants::api_name_to_internal(&raw_data.api_name);
             if let Err(e) = storage.create_raw_data(&mut raw_data).await {
                 warn!("Failed to save raw data to storage: {}", e);
             }

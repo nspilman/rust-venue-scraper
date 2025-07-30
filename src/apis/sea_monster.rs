@@ -20,7 +20,7 @@ impl SeaMonsterCrawler {
 #[async_trait::async_trait]
 impl EventApi for SeaMonsterCrawler {
     fn api_name(&self) -> &'static str {
-        "crawler_sea_monster"
+        "sea_monster"
     }
 
     fn has_venues(&self) -> bool {

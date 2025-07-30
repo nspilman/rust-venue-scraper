@@ -558,7 +558,7 @@ impl Carpenter {
     }
 }
 
-/// Arguments for creating/updating a venue
+/// Arguments for creating/updating a venue (carpenter-specific)
 #[derive(Debug, Clone)]
 pub struct VenueArgs {
     pub name: String,
@@ -573,7 +573,7 @@ pub struct VenueArgs {
     pub neighborhood: Option<String>,
 }
 
-/// Arguments for creating/updating an artist
+/// Arguments for creating/updating an artist (carpenter-specific)
 #[derive(Debug, Clone)]
 pub struct ArtistArgs {
     pub name: String,
