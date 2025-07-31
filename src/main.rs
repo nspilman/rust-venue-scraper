@@ -13,6 +13,7 @@ mod types;
 
 use crate::apis::blue_moon::BlueMoonCrawler;
 use crate::apis::sea_monster::SeaMonsterCrawler;
+use crate::apis::darrells_tavern::DarrellsTavernCrawler;
 use crate::carpenter::Carpenter;
 use crate::pipeline::Pipeline;
 use crate::storage::{InMemoryStorage, Storage};
@@ -32,7 +33,7 @@ struct Cli {
 enum Commands {
     /// Run the data ingestion process
     Ingester {
-        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster
+        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern
         #[arg(long)]
         apis: Option<String>,
     },
@@ -54,9 +55,10 @@ enum Commands {
 }
 
 fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
-match api_name {
+    match api_name {
         constants::BLUE_MOON_API => Some(Box::new(BlueMoonCrawler::new())),
         constants::SEA_MONSTER_API => Some(Box::new(SeaMonsterCrawler::new())),
+        constants::DARRELLS_TAVERN_API => Some(Box::new(DarrellsTavernCrawler::new())),
         _ => None,
     }
 }
