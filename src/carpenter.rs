@@ -1,3 +1,4 @@
+use crate::constants::{BLUE_MOON_VENUE_NAME, SEA_MONSTER_VENUE_NAME};
 use crate::error::{Result, ScraperError};
 use crate::pipeline::ProcessedEvent;
 use crate::storage::Storage;
@@ -360,7 +361,7 @@ impl Carpenter {
     /// Create default venue args for known Seattle venues
     fn create_default_venue_args(&self, venue_name: &str) -> VenueArgs {
         match venue_name {
-            "Blue Moon Tavern" => VenueArgs {
+            BLUE_MOON_VENUE_NAME => VenueArgs {
                 name: venue_name.to_string(),
                 latitude: 47.6689, // Approximate coordinates for Blue Moon Tavern
                 longitude: -122.3151,
@@ -372,7 +373,7 @@ impl Carpenter {
                 description: Some("Neighborhood tavern in the U-District".to_string()),
                 neighborhood: Some("University District".to_string()),
             },
-            "Sea Monster Lounge" => VenueArgs {
+            SEA_MONSTER_VENUE_NAME => VenueArgs {
                 name: venue_name.to_string(),
                 latitude: 47.6815, // Approximate coordinates for Sea Monster Lounge
                 longitude: -122.3351, 

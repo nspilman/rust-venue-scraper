@@ -1,11 +1,11 @@
 use crate::carpenter::*;
 use crate::error::{Result, ScraperError};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc, NaiveDate};
+use chrono::NaiveDate;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-use tracing::{info, warn, error, debug, instrument};
+use tracing::debug;
 
 /// Storage trait for persisting carpenter data
 #[async_trait]
@@ -13,13 +13,9 @@ pub trait Storage: Send + Sync {
     // Venue operations
     async fn create_venue(&self, venue: &mut Venue) -> Result<()>;
     async fn get_venue_by_name(&self, name: &str) -> Result<Option<Venue>>;
-    async fn get_venue_by_coordinates(&self, lat: f64, lon: f64) -> Result<Option<Venue>>;
-    async fn update_venue(&self, venue: &Venue) -> Result<()>;
-
     // Artist operations
     async fn create_artist(&self, artist: &mut Artist) -> Result<()>;
     async fn get_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
-    async fn update_artist(&self, artist: &Artist) -> Result<()>;
 
     // Event operations  
     async fn create_event(&self, event: &mut Event) -> Result<()>;
@@ -28,7 +24,6 @@ pub trait Storage: Send + Sync {
 
     // Raw data operations
     async fn create_raw_data(&self, raw_data: &mut RawData) -> Result<()>;
-    async fn get_raw_data_by_api_and_id(&self, api_name: &str, event_api_id: &str) -> Result<Option<RawData>>;
     async fn get_unprocessed_raw_data(&self, api_name: &str, min_date: Option<NaiveDate>) -> Result<Vec<RawData>>;
     async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()>;
 
@@ -84,32 +79,6 @@ impl Storage for InMemoryStorage {
         Ok(venue)
     }
 
-    async fn get_venue_by_coordinates(&self, lat: f64, lon: f64) -> Result<Option<Venue>> {
-        let venues = self.venues.lock().unwrap();
-        let rounded_lat = (lat * 100000.0).round() / 100000.0;
-        let rounded_lon = (lon * 100000.0).round() / 100000.0;
-        
-        let venue = venues.values()
-            .find(|v| {
-                let venue_lat = (v.latitude * 100000.0).round() / 100000.0;
-                let venue_lon = (v.longitude * 100000.0).round() / 100000.0;
-                venue_lat == rounded_lat && venue_lon == rounded_lon
-            })
-            .cloned();
-        Ok(venue)
-    }
-
-    async fn update_venue(&self, venue: &Venue) -> Result<()> {
-        let venue_id = venue.id.ok_or_else(|| ScraperError::Api { 
-            message: "Cannot update venue without ID".to_string() 
-        })?;
-        
-        let mut venues = self.venues.lock().unwrap();
-        venues.insert(venue_id, venue.clone());
-        
-        debug!("Updated venue: {} with id {}", venue.name, venue_id);
-        Ok(())
-    }
 
     async fn create_artist(&self, artist: &mut Artist) -> Result<()> {
         let id = Uuid::new_v4();
@@ -130,17 +99,6 @@ impl Storage for InMemoryStorage {
         Ok(artist)
     }
 
-    async fn update_artist(&self, artist: &Artist) -> Result<()> {
-        let artist_id = artist.id.ok_or_else(|| ScraperError::Api { 
-            message: "Cannot update artist without ID".to_string() 
-        })?;
-        
-        let mut artists = self.artists.lock().unwrap();
-        artists.insert(artist_id, artist.clone());
-        
-        debug!("Updated artist: {} with id {}", artist.name, artist_id);
-        Ok(())
-    }
 
     async fn create_event(&self, event: &mut Event) -> Result<()> {
         let id = Uuid::new_v4();
@@ -188,13 +146,6 @@ impl Storage for InMemoryStorage {
         Ok(())
     }
 
-    async fn get_raw_data_by_api_and_id(&self, api_name: &str, event_api_id: &str) -> Result<Option<RawData>> {
-        let raw_data_map = self.raw_data.lock().unwrap();
-        let raw_data = raw_data_map.values()
-            .find(|rd| rd.api_name == api_name && rd.event_api_id == event_api_id)
-            .cloned();
-        Ok(raw_data)
-    }
 
     async fn get_unprocessed_raw_data(&self, api_name: &str, min_date: Option<NaiveDate>) -> Result<Vec<RawData>> {
         let raw_data_map = self.raw_data.lock().unwrap();

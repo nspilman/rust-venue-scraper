@@ -1,3 +1,4 @@
+use crate::constants::{DARRELLS_TAVERN_API, DARRELLS_TAVERN_VENUE_NAME};
 use crate::error::{Result, ScraperError};
 use crate::types::{EventApi, RawEventData, RawDataInfo, EventArgs};
 use chrono::{Datelike, NaiveDate, NaiveTime};
@@ -64,12 +65,9 @@ impl DarrellsTavernCrawler {
 #[async_trait::async_trait]
 impl EventApi for DarrellsTavernCrawler {
     fn api_name(&self) -> &'static str {
-        "darrells_tavern"
+        DARRELLS_TAVERN_API
     }
 
-    fn has_venues(&self) -> bool {
-        true
-    }
 
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
         info!("Fetching events from Darrell's Tavern");
@@ -82,7 +80,7 @@ impl EventApi for DarrellsTavernCrawler {
 
         if let Some(entry_content) = document.select(&entry_content_selector).next() {
             let mut current_date: Option<NaiveDate> = None;
-            let mut nodes = entry_content.children().collect::<Vec<_>>();
+            let nodes = entry_content.children().collect::<Vec<_>>();
             let mut i = 0;
 
             while i < nodes.len() {
@@ -128,7 +126,7 @@ impl EventApi for DarrellsTavernCrawler {
         Ok(RawDataInfo {
             event_api_id: format!("{}_{}", title, event_day_str),
             event_name: title.to_string(),
-            venue_name: "Darrell's Tavern".to_string(),
+            venue_name: DARRELLS_TAVERN_VENUE_NAME.to_string(),
             event_day,
         })
     }

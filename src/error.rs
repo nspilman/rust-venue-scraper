@@ -8,14 +8,8 @@ pub enum ScraperError {
     #[error("JSON deserialization failed: {0}")]
     Json(#[from] serde_json::Error),
     
-    #[error("TOML deserialization failed: {0}")]
-    Toml(#[from] toml::de::Error),
-    
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
-    
-    #[error("Configuration error: {0}")]
-    Config(String),
     
     #[error("Missing required field: {0}")]
     MissingField(String),

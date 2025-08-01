@@ -1,7 +1,8 @@
+use crate::constants::{BLUE_MOON_API, BLUE_MOON_VENUE_NAME};
 use crate::error::{Result, ScraperError};
 use crate::types::{EventApi, RawEventData, RawDataInfo, EventArgs};
 use serde_json::Value;
-use tracing::{info, warn, error, debug, instrument};
+use tracing::{info, debug, instrument};
 
 const CALENDAR_EVENTS_URL: &str = "https://google-calendar.galilcloud.wixapps.net/_api/getEvents?compId=comp-kurk0gts&instance=Cvx_9zA6zBPvynb5y3Ufq9ti1OwqSvCBaRhAgM9XwtA.eyJpbnN0YW5jZUlkIjoiMDg2NDdkMmEtMmViMC00MzgwLWJmZGItNzA2ZGUzMTQ0ZjE0IiwiYXBwRGVmSWQiOiIxMjlhY2I0NC0yYzhhLTgzMTQtZmJjOC03M2Q1Yjk3M2E4OGYiLCJtZXRhU2l0ZUlkIjoiYjcwNTNhNmYtZDNiZC00Y2Y3LTk1MjUtMDRhYTdhZGZjNDc1Iiwic2lnbkRhdGUiOiIyMDIzLTExLTA3VDA3OjAyOjIzLjgxOFoiLCJkZW1vTW9kZSI6ZmFsc2UsImFpZCI6ImI1ZDQ1NDEwLTQ3NjktNGMwYS04MGE0LTdjYTNiNjBjMmI3NSIsImJpVG9rZW4iOiJiZjYxNDc0NS1mZDBkLTBmNzctMmFmZS03NGM3OTljYjhiNjEiLCJzaXRlT3duZXJJZCI6ImM0Mzc5Nzk2LWE5YzUtNDVkYi05MGIxLTE2OGZhZTQ0MTQ2NiJ9";
 
@@ -20,12 +21,9 @@ impl BlueMoonCrawler {
 #[async_trait::async_trait]
 impl EventApi for BlueMoonCrawler {
     fn api_name(&self) -> &'static str {
-        "blue_moon"
+        BLUE_MOON_API
     }
 
-    fn has_venues(&self) -> bool {
-        false // This crawler is for a single, fixed venue
-    }
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
@@ -59,7 +57,7 @@ impl EventApi for BlueMoonCrawler {
         Ok(RawDataInfo {
             event_api_id: id.to_string(),
             event_name: title.to_string(),
-            venue_name: "Blue Moon Tavern".to_string(), // Fixed venue
+            venue_name: BLUE_MOON_VENUE_NAME.to_string(), // Fixed venue
             event_day,
         })
     }

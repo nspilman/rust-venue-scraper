@@ -32,66 +32,6 @@ pub struct PipelineResult {
 pub struct Pipeline;
 
 impl Pipeline {
-    /// Run the complete pipeline for a given API
-    #[instrument(skip(api), fields(api_name = %api.api_name()))]
-    pub async fn run_for_api(api: Box<dyn EventApi>, output_dir: &str) -> Result<PipelineResult> {
-        let api_name = api.api_name().to_string();
-        info!("🚀 Starting pipeline for {}", api_name);
-        println!("🚀 Starting pipeline for {}", api_name);
-        
-        // Step 1: Fetch raw events
-        info!("📡 Fetching events from {}...", api_name);
-        println!("📡 Fetching events from {}...", api_name);
-        let raw_events = api.get_event_list().await?;
-        info!("✅ Fetched {} raw events", raw_events.len());
-        println!("✅ Fetched {} raw events", raw_events.len());
-        
-        // Step 2: Process events
-        info!("🔧 Processing events...");
-        println!("🔧 Processing events...");
-        let mut processed_events = Vec::new();
-        let mut errors = Vec::new();
-        let mut skipped = 0;
-        
-        for (i, raw_event) in raw_events.iter().enumerate() {
-            match Self::process_event(&*api, raw_event) {
-                Ok(Some(processed)) => {
-                    processed_events.push(processed);
-                    if (i + 1) % 10 == 0 {
-                        debug!("Processed {}/{} events", i + 1, raw_events.len());
-                        println!("   Processed {}/{} events", i + 1, raw_events.len());
-                    }
-                }
-                Ok(None) => {
-                    skipped += 1;
-                }
-                Err(e) => {
-                    let error_msg = format!("Failed to process event {}: {}", i, e);
-                    error!("Processing failed for event {}: {}", i, e);
-                    errors.push(error_msg);
-                }
-            }
-        }
-        
-        info!("✅ Processed {} events ({} skipped, {} errors)", 
-                processed_events.len(), skipped, errors.len());
-        println!("✅ Processed {} events ({} skipped, {} errors)", 
-                processed_events.len(), skipped, errors.len());
-        
-        // Step 3: Persist to JSON
-        let output_file = Self::persist_to_json(&processed_events, &api_name, output_dir)?;
-        info!("💾 Saved events to {}", output_file);
-        println!("💾 Saved events to {}", output_file);
-        
-        Ok(PipelineResult {
-            api_name,
-            total_events: raw_events.len(),
-            processed_events: processed_events.len(),
-            skipped_events: skipped,
-            errors,
-            output_file,
-        })
-    }
     
     /// Process a single raw event into a ProcessedEvent
     #[instrument(skip(api, raw_event), fields(api_name = %api.api_name()))]

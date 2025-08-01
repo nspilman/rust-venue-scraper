@@ -1,8 +1,8 @@
+use crate::constants::{SEA_MONSTER_API, SEA_MONSTER_VENUE_NAME};
 use crate::error::{Result, ScraperError};
 use crate::types::{EventApi, RawEventData, RawDataInfo, EventArgs};
 use serde_json::Value;
-use chrono::{DateTime, Utc, NaiveDate, NaiveTime, Local};
-use tracing::{info, warn, error, debug, instrument};
+use tracing::{info, error, debug, instrument};
 use scraper::{Html, Selector};
 
 pub struct SeaMonsterCrawler {
@@ -20,12 +20,9 @@ impl SeaMonsterCrawler {
 #[async_trait::async_trait]
 impl EventApi for SeaMonsterCrawler {
     fn api_name(&self) -> &'static str {
-        "sea_monster"
+        SEA_MONSTER_API
     }
 
-    fn has_venues(&self) -> bool {
-        false
-    }
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
@@ -78,7 +75,7 @@ impl EventApi for SeaMonsterCrawler {
         Ok(RawDataInfo {
             event_api_id: slug.to_string(),
             event_name: title.trim().to_string(),
-            venue_name: "Sea Monster Lounge".to_string(),
+            venue_name: SEA_MONSTER_VENUE_NAME.to_string(),
             event_day,
         })
     }

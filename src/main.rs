@@ -1,9 +1,8 @@
 use clap::{Parser, Subcommand};
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, error};
 
 mod apis;
 mod carpenter;
-mod config;
 mod constants;
 mod error;
 mod logging;
