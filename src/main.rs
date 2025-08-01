@@ -113,10 +113,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Ingester { apis } => {
             println!("🔄 Running ingester pipeline...");
             
-            let api_names = if let Some(api_list) = apis {
+            let api_names: Vec<String> = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
             } else {
-                vec![constants::BLUE_MOON_API.to_string()] // Default
+                // Default to all supported APIs
+                constants::get_supported_apis().iter().map(|s| s.to_string()).collect()
             };
             
             let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
@@ -152,10 +153,11 @@ let mapped_names: Vec<String> = api_list.split(',')
         Commands::Run { apis } => {
             println!("🚀 Running full pipeline (ingester + carpenter)...");
             
-            let api_names = if let Some(api_list) = apis {
+            let api_names: Vec<String> = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
             } else {
-                vec![constants::BLUE_MOON_API.to_string()] // Default
+                // Default to all supported APIs
+                constants::get_supported_apis().iter().map(|s| s.to_string()).collect()
             };
             
             let storage: Arc<dyn Storage> = Arc::new(InMemoryStorage::new());
