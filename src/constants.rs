@@ -1,6 +1,5 @@
 /// API name constants to ensure consistency across the codebase
 /// These constants define the mapping between user-friendly API names and internal names
-
 // User-friendly API names (used in CLI)
 pub const BLUE_MOON_API: &str = "blue_moon";
 pub const SEA_MONSTER_API: &str = "sea_monster";
@@ -28,7 +27,6 @@ pub fn api_name_to_internal(api_name: &str) -> String {
         other => other.to_string(),
     }
 }
-
 
 /// Get all supported user-friendly API names
 pub fn get_supported_apis() -> Vec<&'static str> {

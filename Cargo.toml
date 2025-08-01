@@ -9,8 +9,8 @@ description = "Rust-based event data scraper for Seattle Music Scene"
 tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
 
-# Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }
+# Database - Turso/libSQL
+libsql = "0.4"
 
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
@@ -42,3 +42,10 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Async traits
 async-trait = "0.1"
+
+# GraphQL
+async-graphql = { version = "7.0", features = ["chrono"] }
+async-graphql-axum = "7.0"
+axum = { version = "0.8", features = ["json", "query", "tokio"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }

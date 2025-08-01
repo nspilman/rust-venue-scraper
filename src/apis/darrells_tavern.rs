@@ -1,6 +1,6 @@
 use crate::constants::{DARRELLS_TAVERN_API, DARRELLS_TAVERN_VENUE_NAME};
 use crate::error::{Result, ScraperError};
-use crate::types::{EventApi, RawEventData, RawDataInfo, EventArgs};
+use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use chrono::{Datelike, NaiveDate, NaiveTime};
 use scraper::{Html, Selector};
 use serde_json::Value;
@@ -8,6 +8,12 @@ use tracing::{info, warn};
 
 pub struct DarrellsTavernCrawler {
     client: reqwest::Client,
+}
+
+impl Default for DarrellsTavernCrawler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DarrellsTavernCrawler {
@@ -51,10 +57,13 @@ impl DarrellsTavernCrawler {
         let lines: Vec<&str> = text_content.split('\n').collect();
         for line in lines {
             let line = line.trim();
-            if !line.is_empty() && !performers.iter().any(|p| line.contains(p)) {
-                if !line.contains("DOORS") && !line.contains("SHOW") && !line.contains("$") {
-                    performers.push(line.to_string());
-                }
+            if !line.is_empty()
+                && !performers.iter().any(|p| line.contains(p))
+                && !line.contains("DOORS")
+                && !line.contains("SHOW")
+                && !line.contains("$")
+            {
+                performers.push(line.to_string());
             }
         }
 
@@ -67,7 +76,6 @@ impl EventApi for DarrellsTavernCrawler {
     fn api_name(&self) -> &'static str {
         DARRELLS_TAVERN_API
     }
-
 
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
         info!("Fetching events from Darrell's Tavern");
@@ -85,7 +93,7 @@ impl EventApi for DarrellsTavernCrawler {
 
             while i < nodes.len() {
                 let node = nodes[i];
-                
+
                 if let Some(element) = node.value().as_element() {
                     if element.name() == "h1" {
                         let element_ref = scraper::ElementRef::wrap(node).unwrap();
@@ -94,12 +102,16 @@ impl EventApi for DarrellsTavernCrawler {
                     } else if element.name() == "p" && current_date.is_some() {
                         let element_ref = scraper::ElementRef::wrap(node).unwrap();
                         let performers = self.extract_performers(&element_ref);
-                        
+
                         if !performers.is_empty() {
                             for performer in performers {
                                 let mut event_data = serde_json::Map::new();
-                                event_data.insert("title".to_string(), Value::String(performer.clone()));
-                                event_data.insert("event_day".to_string(), Value::String(current_date.unwrap().to_string()));
+                                event_data
+                                    .insert("title".to_string(), Value::String(performer.clone()));
+                                event_data.insert(
+                                    "event_day".to_string(),
+                                    Value::String(current_date.unwrap().to_string()),
+                                );
                                 events.push(Value::Object(event_data));
                             }
                         }
@@ -118,13 +130,21 @@ impl EventApi for DarrellsTavernCrawler {
     }
 
     fn get_raw_data_info(&self, raw_data: &RawEventData) -> Result<RawDataInfo> {
-        let title = raw_data["title"].as_str().ok_or_else(|| ScraperError::MissingField("title not found".into()))?;
-        let event_day_str = raw_data["event_day"].as_str().ok_or_else(|| ScraperError::MissingField("event_day not found".into()))?;
-        let event_day = chrono::NaiveDate::parse_from_str(event_day_str, "%Y-%m-%d")
-            .map_err(|e| ScraperError::Api { message: format!("Failed to parse event_day: {}", e) })?;
+        let title = raw_data["title"]
+            .as_str()
+            .ok_or_else(|| ScraperError::MissingField("title not found".into()))?;
+        let event_day_str = raw_data["event_day"]
+            .as_str()
+            .ok_or_else(|| ScraperError::MissingField("event_day not found".into()))?;
+        let event_day =
+            chrono::NaiveDate::parse_from_str(event_day_str, "%Y-%m-%d").map_err(|e| {
+                ScraperError::Api {
+                    message: format!("Failed to parse event_day: {e}"),
+                }
+            })?;
 
         Ok(RawDataInfo {
-            event_api_id: format!("{}_{}", title, event_day_str),
+            event_api_id: format!("{title}_{event_day_str}"),
             event_name: title.to_string(),
             venue_name: DARRELLS_TAVERN_VENUE_NAME.to_string(),
             event_day,
@@ -132,10 +152,18 @@ impl EventApi for DarrellsTavernCrawler {
     }
 
     fn get_event_args(&self, raw_data: &RawEventData) -> Result<EventArgs> {
-        let title = raw_data["title"].as_str().ok_or_else(|| ScraperError::MissingField("title not found".into()))?;
-        let event_day_str = raw_data["event_day"].as_str().ok_or_else(|| ScraperError::MissingField("event_day not found".into()))?;
-        let event_day = chrono::NaiveDate::parse_from_str(event_day_str, "%Y-%m-%d")
-            .map_err(|e| ScraperError::Api { message: format!("Failed to parse event_day: {}", e) })?;
+        let title = raw_data["title"]
+            .as_str()
+            .ok_or_else(|| ScraperError::MissingField("title not found".into()))?;
+        let event_day_str = raw_data["event_day"]
+            .as_str()
+            .ok_or_else(|| ScraperError::MissingField("event_day not found".into()))?;
+        let event_day =
+            chrono::NaiveDate::parse_from_str(event_day_str, "%Y-%m-%d").map_err(|e| {
+                ScraperError::Api {
+                    message: format!("Failed to parse event_day: {e}"),
+                }
+            })?;
 
         Ok(EventArgs {
             title: title.to_string(),
@@ -147,4 +175,3 @@ impl EventApi for DarrellsTavernCrawler {
         })
     }
 }
-

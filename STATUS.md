@@ -25,29 +25,28 @@
    - Web scraping implementation
    - Data transformation
 
-### 🚧 Partially Implemented
-- **Carpenter System**: Framework exists but needs full data processing logic
-- **Storage Layer**: In-memory implementation complete, PostgreSQL integration pending
-- **Data Models**: Core structures defined, need database schema mapping
+### ✅ Recently Completed
+- **Database Integration**: Full Turso/libSQL integration with nodes and edges schema
+- **Storage Layer**: Both in-memory and database storage implementations complete
+- **Carpenter System**: Complete data processing logic with database persistence
+- **Graph Database Schema**: Nodes and edges implementation with relationship tracking
+- **CLI Database Support**: Command-line flags for choosing storage backend
+
+### 📧 Partially Implemented
+- **Data Models**: Core structures defined and fully mapped to database schema
 
 ### 📋 Next Priority Items
 
-#### High Priority (Critical Path)
-1. **Database Integration**
-   - Implement PostgreSQL connection with SQLx
-   - Create database schema migrations
-   - Replace in-memory storage with real database operations
-
-2. **Complete Carpenter Logic**
-   - Implement venue creation/matching logic
-   - Add artist extraction and management
-   - Build event deduplication and update logic
-   - Add proper change tracking and audit logging
-
-3. **Add Ticketmaster API Integration**
+#### High Priority (Critical Path) 
+1. **Add Ticketmaster API Integration**
    - Most important external API (mentioned in config.toml)
    - High data volume and reliability
    - Reference implementation for other APIs
+
+2. **Enhanced Carpenter Features**
+   - Advanced artist extraction from event titles
+   - Better venue matching logic with fuzzy search
+   - Event deduplication across multiple sources
 
 #### Medium Priority
 4. **Remaining Web Crawlers**
@@ -76,10 +75,10 @@
 
 ## Technical Debt & Improvements Needed
 
-### Storage Layer
-- Current in-memory storage is functional but won't persist data
-- Need proper database schema design
-- Transaction management for data consistency
+### Storage Layer - ✅ RESOLVED
+- ~~Current in-memory storage is functional but won't persist data~~ → **Database storage implemented**
+- ~~Need proper database schema design~~ → **Nodes and edges schema implemented**
+- ~~Transaction management for data consistency~~ → **Database transactions handled by libSQL**
 
 ### Error Handling
 - Basic error propagation works but could be more granular
@@ -99,18 +98,20 @@
 ## Migration Progress vs Original Plan
 
 **✅ Completed from Migration Plan:**
-- Dual-component pipeline (Ingester/Carpenter)
+- Dual-component pipeline (Ingester/Carpenter) 
 - Strategy pattern via EventApi trait
 - ETL architecture
 - Asynchronous HTTP with tokio/reqwest
 - HTML parsing with scraper
 - Standalone executable
 - Basic configuration management
+- **Database compatibility (Turso/libSQL with graph schema)**
+- **Full data persistence with nodes and edges**
+- **Carpenter run tracking and audit logging**
 
 **🚧 In Progress:**
-- Database compatibility (structures ready, connection pending)
-- Idempotency (framework ready, logic needed)
-- Logging & auditing (basic logging done, detailed tracking needed)
+- Idempotency (framework ready, enhanced logic needed)
+- Advanced logging & metrics (basic logging done, detailed tracking needed)
 
 **📋 Not Started:**
 - Most external API integrations

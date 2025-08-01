@@ -3,11 +3,11 @@ use crate::error::{Result, ScraperError};
 use crate::pipeline::ProcessedEvent;
 use crate::storage::Storage;
 use crate::types::EventArgs as TypesEventArgs;
-use chrono::{DateTime, Utc, NaiveDate, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-use tracing::{info, warn, error, debug, instrument};
 
 /// Change types for carpenter operations
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -142,23 +142,25 @@ impl Carpenter {
         run_id: Uuid,
     ) -> Result<Vec<CarpenterRecord>> {
         let mut change_records = Vec::new();
-        
+
         // Parse the raw data back into structured format for processing
-        let event_args: TypesEventArgs = serde_json::from_value(raw_data.data.clone())
-            .map_err(|e| ScraperError::Api { 
-                message: format!("Failed to parse raw data: {}", e) 
+        let event_args: TypesEventArgs =
+            serde_json::from_value(raw_data.data.clone()).map_err(|e| ScraperError::Api {
+                message: format!("Failed to parse raw data: {e}"),
             })?;
 
         // Step 1: Create or find venue
-        let (venue_id, venue_changes) = self.process_venue(&raw_data, run_id).await?;
+        let (venue_id, venue_changes) = self.process_venue(raw_data, run_id).await?;
         change_records.extend(venue_changes);
 
         // Step 2: Create or find artists (if any)
-        let (artist_ids, artist_changes) = self.process_artists(&raw_data, run_id).await?;
+        let (artist_ids, artist_changes) = self.process_artists(raw_data, run_id).await?;
         change_records.extend(artist_changes);
 
         // Step 3: Create or update event
-        let event_changes = self.process_event(&raw_data, &event_args, venue_id, artist_ids, run_id).await?;
+        let event_changes = self
+            .process_event(raw_data, &event_args, venue_id, artist_ids, run_id)
+            .await?;
         change_records.extend(event_changes);
 
         Ok(change_records)
@@ -172,41 +174,51 @@ impl Carpenter {
         run_id: Uuid,
     ) -> Result<(Uuid, Vec<CarpenterRecord>)> {
         let mut change_records = Vec::new();
-        
+
         // Try to find existing venue by name
         if let Some(existing_venue) = self.storage.get_venue_by_name(&raw_data.venue_name).await? {
-            debug!("Found existing venue: {} ({})", existing_venue.name, existing_venue.id.unwrap());
-            
-            change_records.push(CarpenterRecord::new(
-                run_id,
-                raw_data.api_name.clone(),
-                raw_data.id,
-                ChangeType::NoChange,
-                format!("Using existing venue: {}", existing_venue.name),
-                FieldChanged::Venue,
-            ).with_venue(existing_venue.id.unwrap()));
-            
+            debug!(
+                "Found existing venue: {} ({})",
+                existing_venue.name,
+                existing_venue.id.unwrap()
+            );
+
+            change_records.push(
+                CarpenterRecord::new(
+                    run_id,
+                    raw_data.api_name.clone(),
+                    raw_data.id,
+                    ChangeType::NoChange,
+                    format!("Using existing venue: {}", existing_venue.name),
+                    FieldChanged::Venue,
+                )
+                .with_venue(existing_venue.id.unwrap()),
+            );
+
             return Ok((existing_venue.id.unwrap(), change_records));
         }
 
         // Create new venue with default coordinates for Seattle venues
         let venue_args = self.create_default_venue_args(&raw_data.venue_name);
         let mut new_venue = Venue::new(venue_args);
-        
+
         self.storage.create_venue(&mut new_venue).await?;
         let venue_id = new_venue.id.unwrap();
-        
+
         info!("Created new venue: {} ({})", new_venue.name, venue_id);
-        
-        change_records.push(CarpenterRecord::new(
-            run_id,
-            raw_data.api_name.clone(),
-            raw_data.id,
-            ChangeType::Created,
-            format!("Created new venue: {}", new_venue.name),
-            FieldChanged::Venue,
-        ).with_venue(venue_id));
-        
+
+        change_records.push(
+            CarpenterRecord::new(
+                run_id,
+                raw_data.api_name.clone(),
+                raw_data.id,
+                ChangeType::Created,
+                format!("Created new venue: {}", new_venue.name),
+                FieldChanged::Venue,
+            )
+            .with_venue(venue_id),
+        );
+
         Ok((venue_id, change_records))
     }
 
@@ -219,19 +231,21 @@ impl Carpenter {
     ) -> Result<(Vec<Uuid>, Vec<CarpenterRecord>)> {
         let mut change_records = Vec::new();
         let mut artist_ids = Vec::new();
-        
+
         // For now, most crawlers don't extract artist info
         // This is a placeholder for future enhancement when we add artist extraction
-        
+
         // Try to extract artist names from event title (basic heuristics)
         if let Some(extracted_artists) = self.extract_artists_from_title(&raw_data.event_name) {
             for artist_name in extracted_artists {
-                let (artist_id, artist_change_records) = self.process_single_artist(&artist_name, raw_data, run_id).await?;
+                let (artist_id, artist_change_records) = self
+                    .process_single_artist(&artist_name, raw_data, run_id)
+                    .await?;
                 artist_ids.push(artist_id);
                 change_records.extend(artist_change_records);
             }
         }
-        
+
         Ok((artist_ids, change_records))
     }
 
@@ -244,20 +258,27 @@ impl Carpenter {
         run_id: Uuid,
     ) -> Result<(Uuid, Vec<CarpenterRecord>)> {
         let mut change_records = Vec::new();
-        
+
         // Try to find existing artist
         if let Some(existing_artist) = self.storage.get_artist_by_name(artist_name).await? {
-            debug!("Found existing artist: {} ({})", existing_artist.name, existing_artist.id.unwrap());
-            
-            change_records.push(CarpenterRecord::new(
-                run_id,
-                raw_data.api_name.clone(),
-                raw_data.id,
-                ChangeType::NoChange,
-                format!("Using existing artist: {}", existing_artist.name),
-                FieldChanged::Artist,
-            ).with_artist(existing_artist.id.unwrap()));
-            
+            debug!(
+                "Found existing artist: {} ({})",
+                existing_artist.name,
+                existing_artist.id.unwrap()
+            );
+
+            change_records.push(
+                CarpenterRecord::new(
+                    run_id,
+                    raw_data.api_name.clone(),
+                    raw_data.id,
+                    ChangeType::NoChange,
+                    format!("Using existing artist: {}", existing_artist.name),
+                    FieldChanged::Artist,
+                )
+                .with_artist(existing_artist.id.unwrap()),
+            );
+
             return Ok((existing_artist.id.unwrap(), change_records));
         }
 
@@ -267,22 +288,25 @@ impl Carpenter {
             bio: None,
             artist_image_url: None,
         };
-        
+
         let mut new_artist = Artist::new(artist_args);
         self.storage.create_artist(&mut new_artist).await?;
         let artist_id = new_artist.id.unwrap();
-        
+
         info!("Created new artist: {} ({})", new_artist.name, artist_id);
-        
-        change_records.push(CarpenterRecord::new(
-            run_id,
-            raw_data.api_name.clone(),
-            raw_data.id,
-            ChangeType::Created,
-            format!("Created new artist: {}", new_artist.name),
-            FieldChanged::Artist,
-        ).with_artist(artist_id));
-        
+
+        change_records.push(
+            CarpenterRecord::new(
+                run_id,
+                raw_data.api_name.clone(),
+                raw_data.id,
+                ChangeType::Created,
+                format!("Created new artist: {}", new_artist.name),
+                FieldChanged::Artist,
+            )
+            .with_artist(artist_id),
+        );
+
         Ok((artist_id, change_records))
     }
 
@@ -297,45 +321,59 @@ impl Carpenter {
         run_id: Uuid,
     ) -> Result<Vec<CarpenterRecord>> {
         let mut change_records = Vec::new();
-        
+
         // Try to find existing event by venue, date, and title
-        if let Some(existing_event) = self.storage.get_event_by_venue_date_title(
-            venue_id, 
-            event_args.event_day, 
-            &event_args.title
-        ).await? {
-            debug!("Found existing event: {} ({})", existing_event.title, existing_event.id.unwrap());
-            
+        if let Some(existing_event) = self
+            .storage
+            .get_event_by_venue_date_title(venue_id, event_args.event_day, &event_args.title)
+            .await?
+        {
+            debug!(
+                "Found existing event: {} ({})",
+                existing_event.title,
+                existing_event.id.unwrap()
+            );
+
             // Check if event needs updating
             let needs_update = self.event_needs_update(&existing_event, event_args, &artist_ids);
-            
+
             if needs_update {
                 let mut updated_event = existing_event.clone();
                 self.update_event_from_args(&mut updated_event, event_args, artist_ids);
-                
+
                 self.storage.update_event(&updated_event).await?;
-                
-                info!("Updated existing event: {} ({})", updated_event.title, updated_event.id.unwrap());
-                
-                change_records.push(CarpenterRecord::new(
-                    run_id,
-                    raw_data.api_name.clone(),
-                    raw_data.id,
-                    ChangeType::Updated,
-                    format!("Updated event: {}", updated_event.title),
-                    FieldChanged::Event,
-                ).with_event(updated_event.id.unwrap()));
+
+                info!(
+                    "Updated existing event: {} ({})",
+                    updated_event.title,
+                    updated_event.id.unwrap()
+                );
+
+                change_records.push(
+                    CarpenterRecord::new(
+                        run_id,
+                        raw_data.api_name.clone(),
+                        raw_data.id,
+                        ChangeType::Updated,
+                        format!("Updated event: {}", updated_event.title),
+                        FieldChanged::Event,
+                    )
+                    .with_event(updated_event.id.unwrap()),
+                );
             } else {
-                change_records.push(CarpenterRecord::new(
-                    run_id,
-                    raw_data.api_name.clone(),
-                    raw_data.id,
-                    ChangeType::NoChange,
-                    format!("No changes needed for event: {}", existing_event.title),
-                    FieldChanged::Event,
-                ).with_event(existing_event.id.unwrap()));
+                change_records.push(
+                    CarpenterRecord::new(
+                        run_id,
+                        raw_data.api_name.clone(),
+                        raw_data.id,
+                        ChangeType::NoChange,
+                        format!("No changes needed for event: {}", existing_event.title),
+                        FieldChanged::Event,
+                    )
+                    .with_event(existing_event.id.unwrap()),
+                );
             }
-            
+
             return Ok(change_records);
         }
 
@@ -343,18 +381,27 @@ impl Carpenter {
         let mut new_event = Event::from_types_args(event_args.clone(), venue_id, artist_ids);
         self.storage.create_event(&mut new_event).await?;
         let event_id = new_event.id.unwrap();
-        
-        info!("Created new event: {} ({}) on {}", new_event.title, event_id, new_event.event_day);
-        
-        change_records.push(CarpenterRecord::new(
-            run_id,
-            raw_data.api_name.clone(),
-            raw_data.id,
-            ChangeType::Created,
-            format!("Created new event: {} on {}", new_event.title, new_event.event_day),
-            FieldChanged::Event,
-        ).with_event(event_id));
-        
+
+        info!(
+            "Created new event: {} ({}) on {}",
+            new_event.title, event_id, new_event.event_day
+        );
+
+        change_records.push(
+            CarpenterRecord::new(
+                run_id,
+                raw_data.api_name.clone(),
+                raw_data.id,
+                ChangeType::Created,
+                format!(
+                    "Created new event: {} on {}",
+                    new_event.title, new_event.event_day
+                ),
+                FieldChanged::Event,
+            )
+            .with_event(event_id),
+        );
+
         Ok(change_records)
     }
 
@@ -376,7 +423,7 @@ impl Carpenter {
             SEA_MONSTER_VENUE_NAME => VenueArgs {
                 name: venue_name.to_string(),
                 latitude: 47.6815, // Approximate coordinates for Sea Monster Lounge
-                longitude: -122.3351, 
+                longitude: -122.3351,
                 address: "2202 N 45th St".to_string(),
                 postal_code: "98103".to_string(),
                 city: "Seattle".to_string(),
@@ -407,16 +454,17 @@ impl Carpenter {
     fn extract_artists_from_title(&self, title: &str) -> Option<Vec<String>> {
         // Simple heuristics - look for common patterns
         // This is a basic implementation; real-world would be more sophisticated
-        
+
         // Skip certain event types that don't typically have extractable artists
         let lower_title = title.to_lowercase();
-        if lower_title.contains("open mic") || 
-           lower_title.contains("karaoke") ||
-           lower_title.contains("trivia") ||
-           lower_title.contains("bingo") {
+        if lower_title.contains("open mic")
+            || lower_title.contains("karaoke")
+            || lower_title.contains("trivia")
+            || lower_title.contains("bingo")
+        {
             return None;
         }
-        
+
         // Look for common separators
         if title.contains(" with ") {
             let parts: Vec<&str> = title.split(" with ").collect();
@@ -424,17 +472,20 @@ impl Carpenter {
                 return Some(parts.into_iter().map(|s| s.trim().to_string()).collect());
             }
         }
-        
+
         if title.contains(" & ") {
             let parts: Vec<&str> = title.split(" & ").collect();
             if parts.len() >= 2 {
                 return Some(parts.into_iter().map(|s| s.trim().to_string()).collect());
             }
         }
-        
+
         // If no separators found, treat the whole title as a single artist
         // But only if it looks like an artist name (not an event description)
-        if !lower_title.contains("night") && !lower_title.contains("show") && !lower_title.contains("party") {
+        if !lower_title.contains("night")
+            && !lower_title.contains("show")
+            && !lower_title.contains("party")
+        {
             Some(vec![title.trim().to_string()])
         } else {
             None
@@ -442,21 +493,32 @@ impl Carpenter {
     }
 
     /// Check if an event needs updating based on new data
-    fn event_needs_update(&self, existing_event: &Event, new_args: &TypesEventArgs, new_artist_ids: &[Uuid]) -> bool {
+    fn event_needs_update(
+        &self,
+        existing_event: &Event,
+        new_args: &TypesEventArgs,
+        new_artist_ids: &[Uuid],
+    ) -> bool {
         // Check if any key fields have changed
-        if existing_event.start_time != new_args.start_time ||
-           existing_event.event_url != new_args.event_url ||
-           existing_event.description != new_args.description ||
-           existing_event.event_image_url != new_args.event_image_url ||
-           existing_event.artist_ids != new_artist_ids {
+        if existing_event.start_time != new_args.start_time
+            || existing_event.event_url != new_args.event_url
+            || existing_event.description != new_args.description
+            || existing_event.event_image_url != new_args.event_image_url
+            || existing_event.artist_ids != new_artist_ids
+        {
             return true;
         }
-        
+
         false
     }
 
     /// Update an event with new args
-    fn update_event_from_args(&self, event: &mut Event, new_args: &TypesEventArgs, new_artist_ids: Vec<Uuid>) {
+    fn update_event_from_args(
+        &self,
+        event: &mut Event,
+        new_args: &TypesEventArgs,
+        new_artist_ids: Vec<Uuid>,
+    ) {
         event.start_time = new_args.start_time;
         event.event_url = new_args.event_url.clone();
         event.description = new_args.description.clone();
@@ -466,47 +528,65 @@ impl Carpenter {
 
     #[instrument(skip(self))]
     pub async fn run(
-        &self, 
-        apis: Option<Vec<String>>, 
-        min_date: Option<NaiveDate>, 
-        process_all: bool
+        &self,
+        apis: Option<Vec<String>>,
+        min_date: Option<NaiveDate>,
+        process_all: bool,
     ) -> Result<()> {
         let run_name = self.create_run_name(&apis, &min_date, process_all);
         let mut carpenter_run = CarpenterRun::new(run_name);
-        self.storage.create_carpenter_run(&mut carpenter_run).await?;
+        self.storage
+            .create_carpenter_run(&mut carpenter_run)
+            .await?;
         let run_id = carpenter_run.id.unwrap();
 
         info!(run_id = ?run_id, "Starting Carpenter run");
 
-        let api_list = apis.unwrap_or_else(|| crate::types::API_PRIORITY_ORDER.iter().map(|s| s.to_string()).collect());
+        let api_list = apis.unwrap_or_else(|| {
+            crate::types::API_PRIORITY_ORDER
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        });
 
         for api_name in api_list {
-            self.process_api(&api_name, run_id, min_date, process_all).await?;
+            self.process_api(&api_name, run_id, min_date, process_all)
+                .await?;
         }
 
         carpenter_run.finish();
         self.storage.update_carpenter_run(&carpenter_run).await?;
         info!(run_id = ?run_id, "Finished Carpenter run");
-        
+
         Ok(())
     }
 
     #[instrument(skip(self, api_name, run_id))]
     async fn process_api(
-        &self, 
-        api_name: &str, 
+        &self,
+        api_name: &str,
         run_id: Uuid,
         min_date: Option<NaiveDate>,
-        process_all: bool
+        process_all: bool,
     ) -> Result<()> {
         info!("Processing API: {}", api_name);
-        let raw_data_list = self.storage.get_unprocessed_raw_data(api_name, min_date).await?;
-        info!("Found {} unprocessed raw data records for {}", raw_data_list.len(), api_name);
+        let raw_data_list = self
+            .storage
+            .get_unprocessed_raw_data(api_name, min_date)
+            .await?;
+        info!(
+            "Found {} unprocessed raw data records for {}",
+            raw_data_list.len(),
+            api_name
+        );
 
         let raw_data_count = raw_data_list.len();
         for raw_data in raw_data_list {
-            info!("Processing raw data: {} - {}", raw_data.event_name, raw_data.event_day);
-            
+            info!(
+                "Processing raw data: {} - {}",
+                raw_data.event_name, raw_data.event_day
+            );
+
             match self.process_single_raw_data(&raw_data, run_id).await {
                 Ok(change_records) => {
                     // Save all change records for this raw data
@@ -515,47 +595,64 @@ impl Carpenter {
                             warn!("Failed to save carpenter record: {}", e);
                         }
                     }
-                    
+
                     // Mark raw data as processed
-                    if let Err(e) = self.storage.mark_raw_data_processed(raw_data.id.unwrap()).await {
-                        error!("Failed to mark raw data {} as processed: {}", raw_data.id.unwrap(), e);
+                    if let Err(e) = self
+                        .storage
+                        .mark_raw_data_processed(raw_data.id.unwrap())
+                        .await
+                    {
+                        error!(
+                            "Failed to mark raw data {} as processed: {}",
+                            raw_data.id.unwrap(),
+                            e
+                        );
                     } else {
                         debug!("Successfully processed raw data: {}", raw_data.event_name);
                     }
                 }
                 Err(e) => {
                     error!("Failed to process raw data {}: {}", raw_data.event_name, e);
-                    
+
                     // Create error record
                     let mut error_record = CarpenterRecord::new(
                         run_id,
                         api_name.to_string(),
                         raw_data.id,
                         ChangeType::Error,
-                        format!("Processing failed: {}", e),
+                        format!("Processing failed: {e}"),
                         FieldChanged::None,
                     );
-                    
-                    if let Err(record_err) = self.storage.create_carpenter_record(&mut error_record).await {
+
+                    if let Err(record_err) = self
+                        .storage
+                        .create_carpenter_record(&mut error_record)
+                        .await
+                    {
                         error!("Failed to save error record: {}", record_err);
                     }
                 }
             }
         }
-        
-        info!("Completed processing {} raw data records for {}", raw_data_count, api_name);
+
+        info!(
+            "Completed processing {} raw data records for {}",
+            raw_data_count, api_name
+        );
         Ok(())
     }
 
     fn create_run_name(
-        &self, 
-        apis: &Option<Vec<String>>, 
-        min_date: &Option<NaiveDate>, 
-        process_all: bool
+        &self,
+        apis: &Option<Vec<String>>,
+        min_date: &Option<NaiveDate>,
+        process_all: bool,
     ) -> String {
-        let api_str = apis.as_ref().map_or("All Apis".to_string(), |a| a.join(", "));
+        let api_str = apis
+            .as_ref()
+            .map_or("All Apis".to_string(), |a| a.join(", "));
         let date_str = min_date.map_or("None".to_string(), |d| d.to_string());
-        format!("Carpenter Run - {} - Min Date: {} - Process All: {}", api_str, date_str, process_all)
+        format!("Carpenter Run - {api_str} - Min Date: {date_str} - Process All: {process_all}")
     }
 }
 
@@ -657,17 +754,21 @@ impl Event {
             created_at: Utc::now(),
         }
     }
-    
+
     /// Create a new event from TypesEventArgs (for compatibility)
     pub fn from_types_args(args: TypesEventArgs, venue_id: Uuid, artist_ids: Vec<Uuid>) -> Self {
-        Self::new(EventArgs {
-            title: args.title,
-            event_day: args.event_day,
-            start_time: args.start_time,
-            event_url: args.event_url,
-            description: args.description,
-            event_image_url: args.event_image_url,
-        }, venue_id, artist_ids)
+        Self::new(
+            EventArgs {
+                title: args.title,
+                event_day: args.event_day,
+                start_time: args.start_time,
+                event_url: args.event_url,
+                description: args.description,
+                event_image_url: args.event_image_url,
+            },
+            venue_id,
+            artist_ids,
+        )
     }
 }
 

@@ -1,7 +1,7 @@
+use crate::constants::{BLUE_MOON_INTERNAL, DARRELLS_TAVERN_INTERNAL, SEA_MONSTER_INTERNAL};
+use crate::error::Result;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
-use crate::constants::{BLUE_MOON_INTERNAL, SEA_MONSTER_INTERNAL, DARRELLS_TAVERN_INTERNAL};
-use crate::error::Result;
 
 /// Raw event data as returned from external APIs/crawlers
 pub type RawEventData = serde_json::Value;
@@ -14,7 +14,6 @@ pub struct RawDataInfo {
     pub venue_name: String,
     pub event_day: NaiveDate,
 }
-
 
 /// Arguments for creating/updating an event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,43 +36,38 @@ pub enum ChangeType {
     Error,
 }
 
-
 /// Core trait that all event data sources must implement
 #[async_trait::async_trait]
 pub trait EventApi: Send + Sync {
     /// Unique identifier for this API/crawler
     fn api_name(&self) -> &'static str;
-    
-    
+
     /// Fetch all events from this data source
     async fn get_event_list(&self) -> Result<Vec<RawEventData>>;
-    
+
     /// Extract raw data info for storage identification
     fn get_raw_data_info(&self, raw_data: &RawEventData) -> Result<RawDataInfo>;
-    
-    
+
     /// Extract event arguments from raw data
     fn get_event_args(&self, raw_data: &RawEventData) -> Result<EventArgs>;
-    
+
     /// Determine if an event should be skipped
     fn should_skip(&self, _raw_data: &RawEventData) -> (bool, String) {
         (false, String::new())
     }
-    
 }
-
 
 /// Represents the priority order of APIs for processing
 pub const API_PRIORITY_ORDER: &[&str] = &[
     "manual",
-    "dice", 
+    "dice",
     "axs",
     "tixr",
     "venuepilot",
     "songkick",
     "bandsintown",
     BLUE_MOON_INTERNAL,
-    DARRELLS_TAVERN_INTERNAL, 
+    DARRELLS_TAVERN_INTERNAL,
     "crawler_little_red_hen",
     SEA_MONSTER_INTERNAL,
     "crawler_skylark",
