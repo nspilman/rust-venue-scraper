@@ -1,0 +1,17 @@
+{
+  "envelope_version": "1.0.0",
+  "source_id": "sea_monster",
+  "idempotency_key": "sea_monster|GET|urlsha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "payload_meta": {
+    "mime_type": "text/html",
+    "size_bytes": 0,
+    "checksum": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  },
+  "content": { "schema_hint": "wix.warmup.events.v1" },
+  "request": { "url": "https://www.seamonsterlounge.com/buy-tickets-in-advance", "method": "GET" },
+  "timing": { "fetched_at": "2025-08-11T00:00:00Z" },
+  "legal": { "license_id": "terms-unknown" },
+  "geo_hint": { "crs": "EPSG:4326", "city_code": "sea-us" },
+  "trace": { "attempt": 1 }
+}
+

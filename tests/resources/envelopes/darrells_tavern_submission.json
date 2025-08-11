@@ -1,0 +1,17 @@
+{
+  "envelope_version": "1.0.0",
+  "source_id": "darrells_tavern",
+  "idempotency_key": "darrells_tavern|GET|urlsha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "payload_meta": {
+    "mime_type": "text/html",
+    "size_bytes": 0,
+    "checksum": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  },
+  "content": { "schema_hint": "wordpress.page.events.v1" },
+  "request": { "url": "https://darrellstavern.com/show-calendar/", "method": "GET" },
+  "timing": { "fetched_at": "2025-08-11T00:00:00Z" },
+  "legal": { "license_id": "terms-unknown" },
+  "geo_hint": { "crs": "EPSG:4326", "city_code": "sea-us" },
+  "trace": { "attempt": 1 }
+}
+

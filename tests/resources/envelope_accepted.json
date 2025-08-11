@@ -1,0 +1,30 @@
+{
+  "envelope_version": "1.0.0",
+  "envelope_id": "6c3a26f2-7d0a-4f5b-8f3d-2ccf4b0e0c9a",
+  "source_id": "venue_events_api",
+  "idempotency_key": "venue_events_api|GET|https://api.venue.com/events?since=2025-08-10T00:00:00Z|etag:W/\"abc123\"",
+  "payload_meta": {
+    "mime_type": "application/json",
+    "encoding": "utf-8",
+    "size_bytes": 482731,
+    "checksum": { "sha256": "4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29181716151413121110" }
+  },
+  "content": { "schema_hint": "events.list.v1" },
+  "request": {
+    "url": "https://api.venue.com/events?since=2025-08-10T00:00:00Z",
+    "method": "GET",
+    "status": 200,
+    "etag": "W/\"abc123\"",
+    "last_modified": "2025-08-10T23:59:59Z"
+  },
+  "timing": {
+    "fetched_at": "2025-08-11T06:10:12Z",
+    "observed_at": "2025-08-10T23:59:59Z",
+    "gateway_received_at": "2025-08-11T06:10:13Z"
+  },
+  "legal": { "license_id": "CC-BY-4.0", "terms_url": "https://api.venue.com/terms", "attribution": "Venue Inc." },
+  "geo_hint": { "crs": "EPSG:4326", "city_code": "van-ca" },
+  "payload_ref": "sha256://4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29181716151413121110",
+  "trace": { "trace_id": "2b1d7d9c-7f2d-42ac-9b2c-2d1aa5f1d7e2", "attempt": 1 }
+}
+

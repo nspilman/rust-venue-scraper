@@ -49,3 +49,6 @@ async-graphql-axum = "7.0"
 axum = { version = "0.8", features = ["json", "query", "tokio"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors"] }
+
+# JSON Schema validation
+jsonschema = "0.17"
