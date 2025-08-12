@@ -1,0 +1,12 @@
+apiVersion: 1
+
+# Automatically add Prometheus as the default datasource
+# so Grafana is immediately usable on `docker-compose up`.
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+

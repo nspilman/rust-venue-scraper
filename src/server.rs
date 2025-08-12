@@ -1,30 +1,16 @@
-use crate::graphql::{create_schema, GraphQLSchema};
 use crate::storage::Storage;
-use async_graphql::http::GraphiQLSource;
-use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use crate::tasks::{gateway_once, parse_run, GatewayOnceParams, GatewayOnceResult, ParseParams, ParseResultSummary};
 use axum::{
     extract::State,
     http::Method,
-    response::{Html, IntoResponse, Json},
+    response::{IntoResponse, Json},
     routing::{get, post},
-    Router,
+    Json as AxumJson, Router,
 };
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
-/// GraphQL endpoint handler
-async fn graphql_handler(
-    State(schema): State<GraphQLSchema>,
-    req: GraphQLRequest,
-) -> GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
-}
-
-/// GraphiQL playground handler
-async fn graphiql() -> impl IntoResponse {
-    Html(GraphiQLSource::build().endpoint("/graphql").finish())
-}
 
 /// Health check endpoint
 async fn health() -> impl IntoResponse {
@@ -35,23 +21,42 @@ async fn health() -> impl IntoResponse {
     }))
 }
 
-/// Create the GraphQL server with all routes
-pub fn create_graphql_server(storage: Arc<dyn Storage>) -> Router {
-    let schema = create_schema(storage);
-
+/// Create the HTTP server with all routes (no GraphQL to reduce deps)
+pub fn create_server(storage: Arc<dyn Storage>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
     Router::new()
-        .route("/graphql", post(graphql_handler))
-        .route("/graphql", get(graphql_handler))
-        .route("/graphiql", get(graphiql))
-        .route("/playground", get(graphiql)) // Alternative endpoint name
         .route("/health", get(health))
+        // Admin/task endpoints
+        .route("/admin/gateway-once", post({
+            let st = storage.clone();
+            move |AxumJson(p): AxumJson<GatewayOnceParams>| {
+                let st = st.clone();
+                async move {
+                    match gateway_once(st, p).await {
+                        Ok(res) => AxumJson::<GatewayOnceResult>(res).into_response(),
+                        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                    }
+                }
+            }
+        }))
+        .route("/admin/parse", post({
+            let st = storage.clone();
+            move |AxumJson(p): AxumJson<ParseParams>| {
+                let st = st.clone();
+                async move {
+                    match parse_run(st, p).await {
+                        Ok(res) => AxumJson::<ParseResultSummary>(res).into_response(),
+                        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                    }
+                }
+            }
+        }))
         .layer(ServiceBuilder::new().layer(cors))
-        .with_state(schema)
+        .with_state(())
 }
 
 /// Start the GraphQL server on the specified port
@@ -59,13 +64,11 @@ pub async fn start_server(
     storage: Arc<dyn Storage>,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let app = create_graphql_server(storage);
+    let app = create_server(storage);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
-    println!("🚀 GraphQL server running on http://localhost:{port}");
-    println!("📊 GraphQL endpoint: http://localhost:{port}/graphql");
-    println!("🎮 GraphiQL playground: http://localhost:{port}/graphiql");
+    println!("🚀 HTTP server running on http://localhost:{port}");
     println!("💚 Health check: http://localhost:{port}/health");
 
     axum::serve(listener, app).await?;

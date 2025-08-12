@@ -1,9 +1,12 @@
 use clap::{Parser, Subcommand};
 use tracing::{error, info, warn};
+// Import metrics macros from the external crate explicitly to avoid collision with local `metrics` module
+use ::metrics::{counter, histogram};
 
 mod apis;
 mod carpenter;
 mod constants;
+#[cfg(feature = "db")]
 mod db;
 mod error;
 mod graphql;
@@ -12,6 +15,8 @@ mod pipeline;
 mod server;
 mod storage;
 mod types;
+mod metrics;
+mod tasks;
 
 mod gateway;
 mod envelope;
@@ -27,9 +32,12 @@ use crate::apis::blue_moon::BlueMoonCrawler;
 use crate::apis::darrells_tavern::DarrellsTavernCrawler;
 use crate::apis::sea_monster::SeaMonsterCrawler;
 use crate::carpenter::Carpenter;
+#[cfg(feature = "db")]
 use crate::db::DatabaseManager;
 use crate::pipeline::Pipeline;
-use crate::storage::{DatabaseStorage, InMemoryStorage, Storage};
+#[cfg(feature = "db")]
+use crate::storage::DatabaseStorage;
+use crate::storage::{InMemoryStorage, Storage};
 use crate::types::EventApi;
 use std::sync::Arc;
 use std::path::PathBuf;
@@ -156,14 +164,20 @@ async fn create_storage(
     use_database: bool,
 ) -> Result<Arc<dyn Storage>, Box<dyn std::error::Error>> {
     if use_database {
-        dotenv::dotenv().ok(); // Load environment variables
-
-        info!("Creating database storage connection...");
-        let db_storage = DatabaseStorage::new().await
-            .map_err(|e| format!("Failed to initialize database storage: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
-
-        info!("✅ Database storage initialized successfully");
-        Ok(Arc::new(db_storage))
+        #[cfg(feature = "db")]
+        {
+            dotenv::dotenv().ok(); // Load environment variables
+            info!("Creating database storage connection...");
+            let db_storage = DatabaseStorage::new().await
+                .map_err(|e| format!("Failed to initialize database storage: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
+            info!("✅ Database storage initialized successfully");
+            return Ok(Arc::new(db_storage));
+        }
+        #[cfg(not(feature = "db"))]
+        {
+            warn!("Database feature not enabled at build time; falling back to in-memory storage");
+            return Ok(Arc::new(InMemoryStorage::new()));
+        }
     } else {
         info!("Using in-memory storage (data will not persist)");
         Ok(Arc::new(InMemoryStorage::new()))
@@ -181,8 +195,19 @@ async fn run_apis(
 
         if let Some(crawler) = create_api(api_name) {
             info!("Starting pipeline");
+
+            // Metrics: mark run start and time the pipeline execution per API
+            let started = std::time::Instant::now();
+            counter!("sms_ingest_runs_total").increment(1);
+
             match Pipeline::run_for_api_with_storage(crawler, output_dir, storage.clone()).await {
                 Ok(result) => {
+                    // Metrics: record successful duration and outcome counts
+                    histogram!("sms_pipeline_duration_seconds").record(started.elapsed().as_secs_f64());
+                    counter!("sms_events_processed_total").increment(result.processed_events as u64);
+                    counter!("sms_events_skipped_total").increment(result.skipped_events as u64);
+                    counter!("sms_pipeline_errors_total").increment(result.errors.len() as u64);
+
                     info!("Pipeline finished");
                     println!("\n📊 Pipeline Results for {api_name}:");
                     println!("   Total events: {}", result.total_events);
@@ -203,6 +228,10 @@ async fn run_apis(
                     }
                 }
                 Err(e) => {
+                    // Metrics: record failed duration and a failure counter
+                    histogram!("sms_pipeline_duration_seconds").record(started.elapsed().as_secs_f64());
+                    counter!("sms_pipeline_failures_total").increment(1);
+
                     error!("Pipeline failed: {}", e);
                 }
             }
@@ -218,6 +247,8 @@ async fn run_apis(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging and load .env
     logging::init_logging();
+    // Initialize Prometheus /metrics exporter
+    metrics::init_metrics();
     dotenv::dotenv().ok();
 
     let cli = Cli::parse();
@@ -519,6 +550,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let reader = IngestLogReader::new(data_root_path_from_arg(&data_root));
             let (lines, _last) = reader.read_next(&consumer, max)?;
             info!("parser: read {} log lines from ingest log", lines.len());
+            {
+                let c = counter!("sms_parse_runs_total");
+                c.increment(1);
+                let h = histogram!("sms_parse_loglines_per_run");
+                h.record(lines.len() as f64);
+            }
             if lines.is_empty() { println!("no_envelopes"); return Ok(()); }
 
             // Build per-run output filename with datetime prefix
@@ -548,6 +585,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .to_string();
                 let envelope_id = val.get("envelope_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let src_id = val.get("envelope").and_then(|e| e.get("source_id")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                {
+                    let c = counter!("sms_parse_envelopes_seen_total");
+                    c.increment(1);
+                }
 
                 // If this line is a dedupe placeholder (no payload_ref) try to resolve the original envelope to get its payload_ref
                 if payload_ref_s.is_empty() {
@@ -583,11 +624,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(filter) = &source_id {
                     if src_id != *filter {
                         total_filtered += 1;
+                        let c = counter!("sms_parse_envelopes_filtered_total");
+                        c.increment(1);
                         continue;
                     }
                 }
                 if payload_ref_s.is_empty() || src_id.is_empty() {
                     warn!("parser: skipping envelope with missing fields: envelope_id='{}' src_id='{}' payload_ref_present={} ", envelope_id, src_id, !payload_ref_s.is_empty());
+                    let c = counter!("sms_parse_skipped_envelopes_total_missing_fields");
+                    c.increment(1);
                     continue;
                 }
 
@@ -626,12 +671,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if !resp.status().is_success() { error!("parser: fetch_bytes_failed envelope_id={} status={}", envelope_id, resp.status().as_u16()); return Err(format!("fetch_bytes_failed: {}", resp.status()).into()); }
                     let b = resp.bytes().await?.to_vec();
                     debug!("parser: fetched bytes via supabase envelope_id={} len={} ", envelope_id, b.len());
+                    let h = histogram!("sms_parse_resolved_payload_bytes");
+                    h.record(b.len() as f64);
                     b
                 } else {
                     if let Some(path) = reader.resolve_payload_path(&payload_ref_s) {
                         debug!("parser: reading payload from local CAS path for envelope_id={} path={} ", envelope_id, path.display());
-                        std::fs::read(path)?
-                    } else { warn!("parser: could not resolve payload path for envelope_id={} payload_ref={}", envelope_id, payload_ref_s); continue }
+                        let b = std::fs::read(path)?;
+                        let h = histogram!("sms_parse_resolved_payload_bytes");
+                        h.record(b.len() as f64);
+                        b
+                    } else { warn!("parser: could not resolve payload path for envelope_id={} payload_ref={}", envelope_id, payload_ref_s); let c = counter!("sms_parse_resolve_payload_errors_total"); c.increment(1); continue }
                 };
                 debug!("parser: resolved payload bytes for envelope_id={} len={}", envelope_id, bytes.len());
 
@@ -641,6 +691,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let spec = load_source_spec(&reg_path)?;
                 let plan = spec.parse_plan_ref.clone().unwrap_or_else(|| "parse_plan:wix_calendar_v1".to_string());
                 info!("parser: parsing envelope_id={} src_id={} plan={} bytes={}", envelope_id, src_id, plan, bytes.len());
+                let parse_t0 = std::time::Instant::now();
                 let recs: Vec<ParsedRecord> = match spec.parse_plan_ref.as_deref() {
                     Some("parse_plan:wix_calendar_v1") | None => {
                         let p = WixCalendarV1Parser::new(src_id.clone(), envelope_id.clone(), payload_ref_s.to_string());
@@ -660,9 +711,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 };
 
+                let parse_secs = parse_t0.elapsed().as_secs_f64();
+                let hpd = histogram!("sms_parse_duration_seconds");
+                hpd.record(parse_secs);
                 if recs.is_empty() {
                     warn!("parser: parser produced 0 records for envelope_id={} src_id={} plan={}", envelope_id, src_id, plan);
                     total_empty_records += 1;
+                    let c = counter!("sms_parse_empty_record_envelopes_total");
+                    c.increment(1);
                 } else {
                     debug!("parser: writing {} records for envelope_id={}", recs.len(), envelope_id);
                 }
@@ -672,6 +728,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     writeln!(out, "{}", line)?;
                 }
                 total_written += recs.len();
+                let cw = counter!("sms_parse_records_written_total");
+                cw.increment(recs.len() as u64);
             }
             info!("parser: done. seen={} filtered_out={} empty_record_envelopes={} written_records={}", total_seen, total_filtered, total_empty_records, total_written);
             println!("parse_done -> {}", prefixed_path.to_string_lossy());
@@ -679,21 +737,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::ClearDb => {
             println!("🗑️  Clearing all data from the database...");
             println!("⚠️  WARNING: This will permanently delete all data!");
-
-            // Load environment variables
-            dotenv::dotenv().ok();
-
-            let db_manager = DatabaseManager::new().await
-                .map_err(|e| format!("Failed to connect to database: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
-
-            match db_manager.clear_all_data().await {
-                Ok(()) => {
-                    println!("✅ Database cleared successfully!");
+            #[cfg(feature = "db")]
+            {
+                // Load environment variables
+                dotenv::dotenv().ok();
+                let db_manager = DatabaseManager::new().await
+                    .map_err(|e| format!("Failed to connect to database: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
+                match db_manager.clear_all_data().await {
+                    Ok(()) => {
+                        println!("✅ Database cleared successfully!");
+                    }
+                    Err(e) => {
+                        error!("Failed to clear database: {}", e);
+                        println!("❌ Failed to clear database: {e}");
+                    }
                 }
-                Err(e) => {
-                    error!("Failed to clear database: {}", e);
-                    println!("❌ Failed to clear database: {e}");
-                }
+            }
+            #[cfg(not(feature = "db"))]
+            {
+                println!("Database feature not enabled at build time; nothing to clear.");
             }
         }
     }

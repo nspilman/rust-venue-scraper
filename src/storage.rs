@@ -1,4 +1,5 @@
 use crate::carpenter::*;
+#[cfg(feature = "db")]
 use crate::db::DatabaseManager;
 use crate::error::{Result, ScraperError};
 use async_trait::async_trait;
@@ -384,10 +385,12 @@ impl Storage for InMemoryStorage {
 }
 
 /// Database storage implementation using Turso/libSQL with nodes and edges schema
+#[cfg(feature = "db")]
 pub struct DatabaseStorage {
     db: Arc<DatabaseManager>,
 }
 
+#[cfg(feature = "db")]
 impl DatabaseStorage {
     pub async fn new() -> Result<Self> {
         let db_manager = DatabaseManager::new().await?;
@@ -488,6 +491,7 @@ impl DatabaseStorage {
 }
 
 #[async_trait]
+#[cfg(feature = "db")]
 impl Storage for DatabaseStorage {
     async fn create_venue(&self, venue: &mut Venue) -> Result<()> {
         let id = Uuid::new_v4();

@@ -1,0 +1,32 @@
+# Ignore Rust build artifacts
+/target
+**/target
+
+# Project runtime/output data that shouldn't be in images
+/data
+/output
+/cas
+/ingest_log
+logs/
+*.log
+*.ndjson
+
+# VCS and editor metadata
+/.git
+/.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Node and other common directories
+node_modules/
+coverage/
+.tmp/
+tmp/
+
+# Docker
+Dockerfile.*
+*.dockerignore
+
+# Optional: comment out if you want lockfile in build cache behavior
+# Cargo.lock

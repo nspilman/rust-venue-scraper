@@ -1,6 +1,7 @@
 pub mod apis;
 pub mod carpenter;
 pub mod constants;
+#[cfg(feature = "db")]
 pub mod db;
 pub mod error;
 pub mod graphql;
@@ -17,3 +18,6 @@ pub mod idempotency;
 pub mod ingest_meta;
 pub mod rate_limiter;
 pub mod ingest_common;
+pub mod ingest_log_reader;
+pub mod parser;
+pub mod tasks;

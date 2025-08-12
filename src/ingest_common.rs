@@ -8,6 +8,8 @@ use crate::registry::load_source_spec;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use std::path::Path;
 use tracing::debug;
+use std::time::Instant;
+use metrics::{counter, histogram};
 
 /// Fetch payload bytes for a source defined in the registry and persist an ingest envelope via the gateway.
 ///
@@ -30,6 +32,10 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
 
     // 2) Cadence: enforce at most twice/day per source (unless bypassed)
     let data_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
+{
+        let c = counter!("sms_cadence_checks_total");
+        c.increment(1);
+    }
     let bypass_cadence = std::env::var("SMS_BYPASS_CADENCE").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
     if !bypass_cadence {
         let meta = IngestMeta::open_at_root(&data_root)
@@ -54,12 +60,27 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     });
     let client = reqwest::Client::new();
     rl.acquire(0).await; // acquire for RPM/concurrency before send
+    let fetch_t0 = Instant::now();
     let resp = client.get(&ep.url).send().await?;
     let status = resp.status().as_u16();
     let headers = resp.headers().clone();
     let bytes = resp.bytes().await?;
     let payload = bytes.to_vec();
     rl.acquire(payload.len() as u64).await; // account for bytes after size known
+
+    // Metrics: fetch duration and payload size
+    let dur = fetch_t0.elapsed().as_secs_f64();
+    let h_dur = histogram!("sms_fetch_duration_seconds");
+    h_dur.record(dur);
+    let h_bytes = histogram!("sms_fetch_payload_bytes");
+    h_bytes.record(payload.len() as f64);
+    if (200..=299).contains(&status) {
+        let c = counter!("sms_fetch_success_total");
+        c.increment(1);
+    } else {
+        let c = counter!("sms_fetch_error_total");
+        c.increment(1);
+    }
 
     let content_type = headers
         .get(CONTENT_TYPE)

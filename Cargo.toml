@@ -14,8 +14,8 @@ path = "src/main.rs"
 tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 
-# Database - Turso/libSQL
-libsql = "0.4"
+# Database - Turso/libSQL (optional, behind the `db` feature to keep builds small)
+libsql = { version = "0.4", optional = true }
 
 # Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
@@ -48,11 +48,13 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Async traits
 async-trait = "0.1"
 
-# GraphQL
-async-graphql = { version = "7.0", features = ["chrono"] }
-async-graphql-axum = "7.0"
-axum = { version = "0.8", features = ["json", "query", "tokio"] }
+# GraphQL (pin to v6 to avoid edition 2024 requirement)
+async-graphql = { version = "6.0", features = ["chrono"] }
+async-graphql-axum = "6.0"
+# Axum 0.7 is compatible with async-graphql v6
+axum = { version = "0.7", features = ["json", "query", "tokio"] }
 tower = "0.4"
+# tower-http 0.5 works with axum 0.7
 tower-http = { version = "0.5", features = ["cors"] }
 
 # JSON Schema validation
@@ -64,4 +66,12 @@ hex = "0.4"
 
 # Local SQLite for ingest metadata (dedupe, offsets)
 rusqlite = { version = "0.31", features = ["bundled"] }
+metrics = "0.23"
+metrics-exporter-prometheus = "0.13"
+
+[features]
+# Default build excludes database (Turso/libSQL) to minimize image size and build time.
+default = []
+# Enable Turso/libSQL-backed storage and related modules
+db = ["libsql"]
 
