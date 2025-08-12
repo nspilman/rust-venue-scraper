@@ -8,6 +8,13 @@ logs/
 # Output
 output/
 
+# Generated parse outputs
+parsed_*.ndjson
+*_parsed_*.ndjson
+
+# Ingestion data (CAS blobs, ingest log, offsets, sidecar DB)
+data/
+
 # Environment
 .env
 

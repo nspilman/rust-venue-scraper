@@ -9,3 +9,11 @@ pub mod pipeline;
 pub mod server;
 pub mod storage;
 pub mod types;
+
+pub mod gateway;
+pub mod envelope;
+pub mod registry;
+pub mod idempotency;
+pub mod ingest_meta;
+pub mod rate_limiter;
+pub mod ingest_common;

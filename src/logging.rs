@@ -14,11 +14,19 @@ pub fn init_logging() {
     let file_layer = fmt::layer().json().with_writer(non_blocking_writer);
 
     // Create a formatted layer for console logging
-    let console_layer = fmt::layer().with_writer(std::io::stdout);
+    let console_layer = fmt::layer()
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_writer(std::io::stdout);
+
+    // Determine filter: respect RUST_LOG if set; otherwise default to verbose for our crate
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("sms_scraper=debug,info"));
 
     // Set the global default subscriber
     tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env().add_directive("sms_scraper=info".parse().unwrap()))
+        .with(env_filter)
         .with(file_layer)
         .with(console_layer)
         .init();

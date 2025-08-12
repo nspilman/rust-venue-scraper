@@ -3,11 +3,16 @@ name = "sms_scraper"
 version = "0.1.0"
 edition = "2021"
 description = "Rust-based event data scraper for Seattle Music Scene"
+autobins = false
+
+[[bin]]
+name = "sms_scraper"
+path = "src/main.rs"
 
 [dependencies]
 # Async runtime and HTTP client
 tokio = { version = "1.0", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 
 # Database - Turso/libSQL
 libsql = "0.4"
@@ -52,3 +57,11 @@ tower-http = { version = "0.5", features = ["cors"] }
 
 # JSON Schema validation
 jsonschema = "0.17"
+
+# Crypto and utilities for CAS/idempotency
+sha2 = "0.10"
+hex = "0.4"
+
+# Local SQLite for ingest metadata (dedupe, offsets)
+rusqlite = { version = "0.31", features = ["bundled"] }
+

@@ -1,5 +1,6 @@
 use crate::constants::{SEA_MONSTER_API, SEA_MONSTER_VENUE_NAME};
 use crate::error::{Result, ScraperError};
+use crate::ingest_common::fetch_payload_and_log;
 use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use scraper::{Html, Selector};
 use serde_json::Value;
@@ -25,19 +26,16 @@ impl SeaMonsterCrawler {
 
 #[async_trait::async_trait]
 impl EventApi for SeaMonsterCrawler {
-    fn api_name(&self) -> &'static str {
-        SEA_MONSTER_API
-    }
+    fn api_name(&self) -> &'static str { SEA_MONSTER_API }
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
-        debug!("Fetching events from Sea Monster Lounge website");
-        let url = "https://www.seamonsterlounge.com/buy-tickets-in-advance";
-        let response = self.client.get(url).send().await?;
-        let body = response.text().await?;
+        // New path: use shared ingestion helper, then parse
+        let payload = fetch_payload_and_log(SEA_MONSTER_API).await?;
+
+        let body = String::from_utf8_lossy(&payload).to_string();
         let document = Html::parse_document(&body);
-        let selector =
-            Selector::parse("script[type=\"application/json\"]#wix-warmup-data").unwrap();
+        let selector = Selector::parse("script[type=\"application/json\"]#wix-warmup-data").unwrap();
 
         if let Some(element) = document.select(&selector).next() {
             debug!("Found wix-warmup-data script tag, parsing JSON");
@@ -50,15 +48,9 @@ impl EventApi for SeaMonsterCrawler {
                     if let Some(widgets) = app_data.as_object() {
                         for (widget_key, widget_data) in widgets {
                             if widget_key.starts_with("widget") {
-                                if let Some(events_data) =
-                                    widget_data.get("events").and_then(|e| e.get("events"))
-                                {
+                                if let Some(events_data) = widget_data.get("events").and_then(|e| e.get("events")) {
                                     if let Some(events_array) = events_data.as_array() {
-                                        debug!(
-                                            "Found {} events in widget {}",
-                                            events_array.len(),
-                                            widget_key
-                                        );
+                                        debug!("Found {} events in widget {}", events_array.len(), widget_key);
                                         for event in events_array {
                                             all_events.push(event.clone());
                                         }
@@ -69,16 +61,11 @@ impl EventApi for SeaMonsterCrawler {
                     }
                 }
             }
-            info!(
-                "Successfully fetched {} events from Sea Monster Lounge",
-                all_events.len()
-            );
+            info!("Successfully fetched {} events from Sea Monster Lounge", all_events.len());
             Ok(all_events)
         } else {
             error!("Could not find wix-warmup-data script tag on Sea Monster page");
-            Err(ScraperError::Api {
-                message: "Could not find wix-warmup-data script tag".to_string(),
-            })
+            Err(ScraperError::Api { message: "Could not find wix-warmup-data script tag".to_string() })
         }
     }
 

@@ -1,0 +1,18 @@
+{
+  "source_id": "blue_moon",
+  "identity": { "name": "Blue Moon Tavern Calendar API", "owner_team": "ingestion", "contact_email": "dataops@example.com" },
+  "enabled": true,
+  "endpoints": [
+    {
+      "url": "https://google-calendar.galilcloud.wixapps.net/_api/getEvents?compId=comp-kurk0gts&instance=Cvx_9zA6zBPvynb5y3Ufq9ti1OwqSvCBaRhAgM9XwtA.eyJpbnN0YW5jZUlkIjoiMDg2NDdkMmEtMmViMC00MzgwLWJmZGItNzA2ZGUzMTQ0ZjE0IiwiYXBwRGVmSWQiOiIxMjlhY2I0NC0yYzhhLTgzMTQtZmJjOC03M2Q1Yjk3M2E4OGYiLCJtZXRhU2l0ZUlkIjoiYjcwNTNhNmYtZDNiZC00Y2Y3LTk1MjUtMDRhYTdhZGZjNDc1Iiwic2lnbkRhdGUiOiIyMDIzLTExLTA3VDA3OjAyOjIzLjgxOFoiLCJkZW1vTW9kZSI6ZmFsc2UsImFpZCI6ImI1ZDQ1NDEwLTQ3NjktNGMwYS04MGE0LTdjYTNiNjBjMmI3NSIsImJpVG9rZW4iOiJiZjYxNDc0NS1mZDBkLTBmNzctMmFmZS03NGM3OTljYjhiNjEiLCJzaXRlT3duZXJJZCI6ImM0Mzc5Nzk2LWE5YzUtNDVkYi05MGIxLTE2OGZhZTQ0MTQ2NiJ9",
+      "method": "GET"
+    }
+  ],
+  "auth": { "method": "none" },
+  "rate_limits": { "requests_per_min": 6, "bytes_per_min": 20000000, "concurrency": 1 },
+  "content": { "allowed_mime_types": ["application/json"], "max_payload_size_bytes": 20000000 },
+  "policy": { "license_id": "terms-unknown", "robots_tos_posture": "respect", "pii_risk_class": "low", "pii_action": "allow" },
+  "change_detection": { "strategy": "etag" },
+  "parse_plan_ref": "parse_plan:wix_calendar_v1"
+}
+

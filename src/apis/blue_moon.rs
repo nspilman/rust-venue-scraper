@@ -1,10 +1,9 @@
 use crate::constants::{BLUE_MOON_API, BLUE_MOON_VENUE_NAME};
 use crate::error::{Result, ScraperError};
+use crate::ingest_common::fetch_payload_and_log;
 use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use serde_json::Value;
 use tracing::{debug, info, instrument};
-
-const CALENDAR_EVENTS_URL: &str = "https://google-calendar.galilcloud.wixapps.net/_api/getEvents?compId=comp-kurk0gts&instance=Cvx_9zA6zBPvynb5y3Ufq9ti1OwqSvCBaRhAgM9XwtA.eyJpbnN0YW5jZUlkIjoiMDg2NDdkMmEtMmViMC00MzgwLWJmZGItNzA2ZGUzMTQ0ZjE0IiwiYXBwRGVmSWQiOiIxMjlhY2I0NC0yYzhhLTgzMTQtZmJjOC03M2Q1Yjk3M2E4OGYiLCJtZXRhU2l0ZUlkIjoiYjcwNTNhNmYtZDNiZC00Y2Y3LTk1MjUtMDRhYTdhZGZjNDc1Iiwic2lnbkRhdGUiOiIyMDIzLTExLTA3VDA3OjAyOjIzLjgxOFoiLCJkZW1vTW9kZSI6ZmFsc2UsImFpZCI6ImI1ZDQ1NDEwLTQ3NjktNGMwYS04MGE0LTdjYTNiNjBjMmI3NSIsImJpVG9rZW4iOiJiZjYxNDc0NS1mZDBkLTBmNzctMmFmZS03NGM3OTljYjhiNjEiLCJzaXRlT3duZXJJZCI6ImM0Mzc5Nzk2LWE5YzUtNDVkYi05MGIxLTE2OGZhZTQ0MTQ2NiJ9";
 
 pub struct BlueMoonCrawler {
     client: reqwest::Client,
@@ -26,18 +25,17 @@ impl BlueMoonCrawler {
 
 #[async_trait::async_trait]
 impl EventApi for BlueMoonCrawler {
-    fn api_name(&self) -> &'static str {
-        BLUE_MOON_API
-    }
+    fn api_name(&self) -> &'static str { BLUE_MOON_API }
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
-        debug!("Fetching events from Blue Moon Tavern calendar API");
-        let response = self.client.get(CALENDAR_EVENTS_URL).send().await?;
-        let data: Value = response.json().await?;
+        // New path: use shared ingestion helper, then parse
+        let payload = fetch_payload_and_log(BLUE_MOON_API).await?;
+
+        let data: Value = serde_json::from_slice(&payload)?;
         let events_by_date = data["eventsByDates"]
             .as_object()
-            .ok_or_else(|| ScraperError::MissingField("eventsByDates not found".into()))?;
+            .ok_or_else(|| crate::error::ScraperError::MissingField("eventsByDates not found".into()))?;
 
         let mut all_events = Vec::new();
         for (day, events) in events_by_date {
@@ -50,10 +48,7 @@ impl EventApi for BlueMoonCrawler {
                 }
             }
         }
-        info!(
-            "Successfully fetched {} events from Blue Moon Tavern",
-            all_events.len()
-        );
+        info!("Successfully fetched {} events from Blue Moon Tavern", all_events.len());
         Ok(all_events)
     }
 

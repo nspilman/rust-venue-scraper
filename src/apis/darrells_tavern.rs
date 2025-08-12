@@ -1,5 +1,6 @@
 use crate::constants::{DARRELLS_TAVERN_API, DARRELLS_TAVERN_VENUE_NAME};
 use crate::error::{Result, ScraperError};
+use crate::ingest_common::fetch_payload_and_log;
 use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use chrono::{Datelike, NaiveDate, NaiveTime};
 use scraper::{Html, Selector};
@@ -73,15 +74,15 @@ impl DarrellsTavernCrawler {
 
 #[async_trait::async_trait]
 impl EventApi for DarrellsTavernCrawler {
-    fn api_name(&self) -> &'static str {
-        DARRELLS_TAVERN_API
-    }
+    fn api_name(&self) -> &'static str { DARRELLS_TAVERN_API }
 
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
-        info!("Fetching events from Darrell's Tavern");
+        info!("Fetching events from Darrell's Tavern via registry and gateway handoff");
 
-        let url = "https://darrellstavern.com/show-calendar/";
-        let response = self.client.get(url).send().await?.text().await?;
+        // New path: use shared ingestion helper, then parse
+        let payload = fetch_payload_and_log(DARRELLS_TAVERN_API).await?;
+
+        let response = String::from_utf8_lossy(&payload).to_string();
         let document = Html::parse_document(&response);
         let entry_content_selector = Selector::parse("div.entry-content").unwrap();
         let mut events = Vec::new();
@@ -106,8 +107,7 @@ impl EventApi for DarrellsTavernCrawler {
                         if !performers.is_empty() {
                             for performer in performers {
                                 let mut event_data = serde_json::Map::new();
-                                event_data
-                                    .insert("title".to_string(), Value::String(performer.clone()));
+                                event_data.insert("title".to_string(), Value::String(performer.clone()));
                                 event_data.insert(
                                     "event_day".to_string(),
                                     Value::String(current_date.unwrap().to_string()),
