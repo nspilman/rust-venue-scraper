@@ -39,7 +39,11 @@ impl Pipeline {
             _ => return,
         };
         let instance = api; // use api name as instance label for clarity
-        let url = format!("{}/metrics/job/{}/instance/{}", base.trim_end_matches('/'), "sms_scraper", instance);
+        let push_url = format!("{}/metrics/job/{}/instance/{}", base.trim_end_matches('/'), "sms_scraper", instance);
+        
+        // Get current timestamp for freshness tracking
+        let timestamp_secs = chrono::Utc::now().timestamp() as f64;
+        
         let body = format!(
             "# TYPE sms_ingest_runs_total counter\n\
              sms_ingest_runs_total 1\n\
@@ -50,22 +54,28 @@ impl Pipeline {
              # TYPE sms_pipeline_errors_total counter\n\
              sms_pipeline_errors_total {}\n\
              # TYPE sms_pipeline_duration_seconds gauge\n\
-             sms_pipeline_duration_seconds {}\n",
-            processed, skipped, errors, duration_secs
+             sms_pipeline_duration_seconds {}\n\
+             # TYPE sms_pipeline_last_run_timestamp_seconds gauge\n\
+             sms_pipeline_last_run_timestamp_seconds {}\n",
+            processed, skipped, errors, duration_secs, timestamp_secs
         );
+        
         let client = reqwest::Client::new();
-        let res = client
-            .post(url)
+        
+        // Step 1: Push metrics to Pushgateway
+        let push_res = client
+            .post(&push_url)
             .header("Content-Type", "text/plain; version=0.0.4")
             .body(body)
             .send()
             .await;
-        match res {
+            
+        match push_res {
             Ok(r) if r.status().is_success() => {
                 tracing::info!("Pushed metrics to Pushgateway for api={}", api);
             }
             Ok(r) => {
-                tracing::warn!("Pushgateway responded with status {} for api={}", r.status().as_u16(), api);
+                tracing::warn!("Pushgateway push responded with status {} for api={}", r.status().as_u16(), api);
             }
             Err(e) => {
                 tracing::warn!("Failed to push metrics to Pushgateway for api={}: {}", api, e);

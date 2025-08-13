@@ -70,16 +70,18 @@ The scraper emits two sets of metrics:
    - These are scraped on a cadence by Prometheus from the exporter.
 
 2) Pushgateway run metrics (one-shot per pipeline run):
-   - Pushed after the pipeline completes successfully.
+   - Pushed after the pipeline completes successfully, then immediately deleted to prevent stale data.
    - Include:
      - sms_ingest_runs_total
      - sms_events_processed_total
      - sms_events_skipped_total
      - sms_pipeline_errors_total
      - sms_pipeline_duration_seconds
+     - sms_pipeline_last_run_timestamp_seconds (NEW: Unix timestamp when pipeline completed)
    - Labeled with instance="<api_name>" so runs for different APIs are distinguishable (e.g., blue_moon, sea_monster, darrells_tavern).
+   - **Delete-on-success behavior**: After pushing, metrics are immediately deleted from Pushgateway to avoid serving stale data between runs.
 
-Note: For histograms during pushgateway reporting we send a single duration value (seconds) per run; the exporter path provides the full histogram buckets for rate/quantile queries.
+Note: For histograms during pushgateway reporting we send a single duration value (seconds) per run; the exporter path provides the full histogram buckets for rate/quantile queries. The timestamp metric enables data freshness tracking in dashboards.
 
 
 ## How metrics flow (two paths)
@@ -194,16 +196,56 @@ Grafana:
 - Refresh to see last-run values populate after a pipeline run
 
 
+## Data Freshness Tracking (NEW)
+
+With the delete-on-success approach, metrics are immediately removed from Pushgateway after being pushed. This creates brief gaps in the data, which is intentional to avoid stale data confusion. To handle this properly in Grafana:
+
+**Recommended Panel Setup:**
+
+1. **Last Run Age** (Stat panel):
+   - Query: `time() - max by (instance) (last_over_time(sms_pipeline_last_run_timestamp_seconds[1h]))`
+   - Units: seconds (with "humanize" option) or use transformation
+   - Thresholds: Green < 1h, Yellow 1-6h, Red > 6h
+   - This shows how long ago each API last ran
+
+2. **Last Run Time** (Stat panel):
+   - Query: `max by (instance) (last_over_time(sms_pipeline_last_run_timestamp_seconds[1h]))`
+   - Units: From timestamp to time (use field override)
+   - Shows the actual timestamp when each API last completed
+
+3. **Updated Last-Run Data Panels**:
+   Use `last_over_time()` to capture values even during gaps:
+   - Events Processed: `last_over_time(sms_events_processed_total[1h])`
+   - Events Skipped: `last_over_time(sms_events_skipped_total[1h])`
+   - Pipeline Errors: `last_over_time(sms_pipeline_errors_total[1h])`
+   - Pipeline Duration: `last_over_time(sms_pipeline_duration_seconds[1h])`
+
+**Benefits of this approach:**
+- Clear distinction between fresh and stale data
+- Explicit data age visibility
+- No confusion about whether displayed values are current
+- Panels show "No data" when appropriate instead of misleading stale values
+
 ## Common Prometheus queries
 
 - Ingest runs by API:
   sum by (instance) (sms_ingest_runs_total)
 
-- Last-run totals by API (from Pushgateway):
-  sum by (instance) (sms_events_processed_total)
-  sum by (instance) (sms_events_skipped_total)
-  sum by (instance) (sms_pipeline_errors_total)
-  sum by (instance) (sms_pipeline_duration_seconds)
+- Last-run totals by API (updated for delete-on-success):
+  last_over_time(sms_events_processed_total[1h])
+  last_over_time(sms_events_skipped_total[1h])
+  last_over_time(sms_pipeline_errors_total[1h])
+  last_over_time(sms_pipeline_duration_seconds[1h])
+
+- Data freshness queries (NEW):
+  # Time since last run (seconds)
+  time() - max by (instance) (last_over_time(sms_pipeline_last_run_timestamp_seconds[1h]))
+  
+  # Last run timestamp per API
+  max by (instance) (last_over_time(sms_pipeline_last_run_timestamp_seconds[1h]))
+  
+  # APIs that haven't run recently (>6 hours)
+  time() - max by (instance) (last_over_time(sms_pipeline_last_run_timestamp_seconds[24h])) > 6*3600
 
 - Rates/quantiles using exporter histogram (from the scraper exporter):
   histogram_quantile(0.95, sum by (le, instance) (rate(sms_pipeline_duration_seconds_bucket[5m])))
@@ -236,6 +278,17 @@ Grafana:
 
 - Slow feedback during development
   - Reduce global.scrape_interval to 1s in ops/prometheus.yml (or use ops/prometheus.local.yml) and restart Prometheus
+
+- Grafana panels show "No data" after implementing delete-on-success (EXPECTED)
+  - This is intentional behavior! Metrics are deleted from Pushgateway after each run
+  - Update panel queries to use last_over_time() with appropriate time ranges (e.g., [1h] or [6h])
+  - Add "Last Run Age" panels to make data freshness explicit
+  - Panels should show values during/immediately after pipeline runs, then go blank until next run
+
+- "Last Run Age" panels show very large values or errors
+  - Ensure the timestamp metric is being pushed correctly (check scraper logs for "Pushed metrics to Pushgateway")
+  - Verify the query uses the right time range: last_over_time(sms_pipeline_last_run_timestamp_seconds[24h]) for APIs that run infrequently
+  - Check that pipeline actually completed successfully (failed runs don't push metrics)
 
 
 ## Notes and best practices
