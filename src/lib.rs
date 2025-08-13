@@ -11,13 +11,17 @@ pub mod server;
 pub mod storage;
 pub mod types;
 
-pub mod gateway;
 pub mod envelope;
-pub mod registry;
+pub mod gateway;
 pub mod idempotency;
-pub mod ingest_meta;
-pub mod rate_limiter;
 pub mod ingest_common;
 pub mod ingest_log_reader;
+pub mod ingest_meta;
+pub mod metrics;
 pub mod parser;
+pub mod rate_limiter;
+pub mod registry;
 pub mod tasks;
+
+// Non-invasive architecture scaffolding to guide future refactors.
+pub mod architecture;

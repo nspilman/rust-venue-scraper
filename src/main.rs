@@ -14,19 +14,23 @@ mod logging;
 mod pipeline;
 mod server;
 mod storage;
-mod types;
-mod metrics;
 mod tasks;
+mod types;
 
-mod gateway;
 mod envelope;
-mod registry;
+mod gateway;
 mod idempotency;
-mod ingest_log_reader;
-mod parser;
-mod ingest_meta;
-mod rate_limiter;
 mod ingest_common;
+mod ingest_log_reader;
+mod ingest_meta;
+mod metrics;
+mod parser;
+mod rate_limiter;
+mod registry;
+
+// Keep this module unreferenced in main binary for now to avoid changing behavior.
+#[allow(dead_code)]
+mod architecture;
 
 use crate::apis::blue_moon::BlueMoonCrawler;
 use crate::apis::darrells_tavern::DarrellsTavernCrawler;
@@ -39,8 +43,8 @@ use crate::pipeline::Pipeline;
 use crate::storage::DatabaseStorage;
 use crate::storage::{InMemoryStorage, Storage};
 use crate::types::EventApi;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "sms_scraper")]
@@ -53,10 +57,26 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum IngestLogCmd {
-    Read { #[arg(long)] consumer: String, #[arg(long, default_value_t = 100)] max: usize },
-    Ack { #[arg(long)] consumer: String, #[arg(long)] envelope_id: String },
-    Status { #[arg(long)] consumer: String },
-    Resolve { #[arg(long)] envelope_id: String },
+    Read {
+        #[arg(long)]
+        consumer: String,
+        #[arg(long, default_value_t = 100)]
+        max: usize,
+    },
+    Ack {
+        #[arg(long)]
+        consumer: String,
+        #[arg(long)]
+        envelope_id: String,
+    },
+    Status {
+        #[arg(long)]
+        consumer: String,
+    },
+    Resolve {
+        #[arg(long)]
+        envelope_id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -148,7 +168,11 @@ enum Commands {
 fn data_root_path_from_arg(data_root: &str) -> PathBuf {
     // If data_root is absolute, use it; otherwise anchor to project dir
     let p = PathBuf::from(data_root);
-    if p.is_absolute() { p } else { PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(p) }
+    if p.is_absolute() {
+        p
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(p)
+    }
 }
 
 fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
@@ -198,15 +222,21 @@ async fn run_apis(
 
             // Metrics: mark run start and time the pipeline execution per API
             let started = std::time::Instant::now();
-            counter!("sms_ingest_runs_total").increment(1);
+            // Use new Sources metrics for ingest runs
+            crate::metrics::SourcesMetrics::record_registry_load_success("");
 
             match Pipeline::run_for_api_with_storage(crawler, output_dir, storage.clone()).await {
                 Ok(result) => {
                     // Metrics: record successful duration and outcome counts
-                    histogram!("sms_pipeline_duration_seconds").record(started.elapsed().as_secs_f64());
-                    counter!("sms_events_processed_total").increment(result.processed_events as u64);
-                    counter!("sms_events_skipped_total").increment(result.skipped_events as u64);
-                    counter!("sms_pipeline_errors_total").increment(result.errors.len() as u64);
+                    // Use new Parser metrics for processing outcomes
+                    crate::metrics::ParserMetrics::record_batch_run_success(
+                        result.processed_events,
+                        started.elapsed().as_secs_f64(),
+                    );
+                    crate::metrics::ParserMetrics::record_envelopes_skipped(result.skipped_events);
+                    if result.errors.len() > 0 {
+                        crate::metrics::ParserMetrics::record_parse_error("", "", "pipeline_error");
+                    }
 
                     info!("Pipeline finished");
                     println!("\n📊 Pipeline Results for {api_name}:");
@@ -229,8 +259,7 @@ async fn run_apis(
                 }
                 Err(e) => {
                     // Metrics: record failed duration and a failure counter
-                    histogram!("sms_pipeline_duration_seconds").record(started.elapsed().as_secs_f64());
-                    counter!("sms_pipeline_failures_total").increment(1);
+                    crate::metrics::ParserMetrics::record_parse_error("", "", "pipeline_failure");
 
                     error!("Pipeline failed: {}", e);
                 }
@@ -247,8 +276,8 @@ async fn run_apis(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging and load .env
     logging::init_logging();
-    // Initialize Prometheus /metrics exporter
-    metrics::init_metrics();
+    // Initialize Prometheus /metrics exporter with phase-based organization
+    crate::metrics::init_metrics();
     dotenv::dotenv().ok();
 
     let cli = Cli::parse();
@@ -256,9 +285,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = "output";
 
     match cli.command {
-        Commands::Ingester { apis, use_database, bypass_cadence } => {
+        Commands::Ingester {
+            apis,
+            use_database,
+            bypass_cadence,
+        } => {
             println!("🔄 Running ingester pipeline...");
-            if bypass_cadence { std::env::set_var("SMS_BYPASS_CADENCE", "1"); }
+            if bypass_cadence {
+                std::env::set_var("SMS_BYPASS_CADENCE", "1");
+            }
 
             let api_names: Vec<String> = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
@@ -305,9 +340,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        Commands::Run { apis, use_database, bypass_cadence } => {
+        Commands::Run {
+            apis,
+            use_database,
+            bypass_cadence,
+        } => {
             println!("🚀 Running full pipeline (ingester + carpenter)...");
-            if bypass_cadence { std::env::set_var("SMS_BYPASS_CADENCE", "1"); }
+            if bypass_cadence {
+                std::env::set_var("SMS_BYPASS_CADENCE", "1");
+            }
 
             let api_names: Vec<String> = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
@@ -374,8 +415,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        Commands::GatewayOnce { source_id, data_root, bypass_cadence } => {
-            use crate::envelope::{ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta};
+        Commands::GatewayOnce {
+            source_id,
+            data_root,
+            bypass_cadence,
+        } => {
+            use crate::envelope::{
+                ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
+            };
             use crate::gateway::Gateway;
             use crate::idempotency::compute_idempotency_key;
             use crate::registry::load_source_spec;
@@ -383,11 +430,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 
             let source = source_id.unwrap_or_else(|| constants::BLUE_MOON_API.to_string());
-            if bypass_cadence { std::env::set_var("SMS_BYPASS_CADENCE", "1"); }
+            if bypass_cadence {
+                std::env::set_var("SMS_BYPASS_CADENCE", "1");
+            }
             let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-            let reg_path = base.join("registry/sources").join(format!("{}.json", source));
-            println!("📘 Loading registry entry from {}", reg_path.to_string_lossy());
-            let spec = load_source_spec(&reg_path).map_err(|e| format!("Failed to load registry: {e}"))?;
+            let reg_path = base
+                .join("registry/sources")
+                .join(format!("{}.json", source));
+            println!(
+                "📘 Loading registry entry from {}",
+                reg_path.to_string_lossy()
+            );
+            let spec =
+                load_source_spec(&reg_path).map_err(|e| format!("Failed to load registry: {e}"))?;
             if !spec.enabled {
                 println!("⛔ Source is disabled in registry");
                 return Ok(());
@@ -397,16 +452,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Enforce very low cadence per source (twice a day), unless bypassed for development
             {
-                let bypass = std::env::var("SMS_BYPASS_CADENCE").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
+                let bypass = std::env::var("SMS_BYPASS_CADENCE")
+                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false);
                 if !bypass {
-                    let meta = crate::ingest_meta::IngestMeta::open_at_root(data_root_path_from_arg(&data_root))?;
+                    let meta = crate::ingest_meta::IngestMeta::open_at_root(
+                        data_root_path_from_arg(&data_root),
+                    )?;
                     let now = chrono::Utc::now().timestamp();
                     let min_interval_secs: i64 = 12 * 60 * 60; // 12 hours
                     if let Some(last) = meta.get_last_fetched_at(&spec.source_id)? {
                         let since = now - last;
                         if since < min_interval_secs {
                             let remain = min_interval_secs - since;
-                            println!("⏳ Skipping fetch for '{}' to respect cadence ({}h remaining)", spec.source_id, (remain as f64 / 3600.0).ceil() as i64);
+                            println!(
+                                "⏳ Skipping fetch for '{}' to respect cadence ({}h remaining)",
+                                spec.source_id,
+                                (remain as f64 / 3600.0).ceil() as i64
+                            );
                             return Ok(());
                         }
                     }
@@ -435,13 +498,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let content_type = headers
                 .get(CONTENT_TYPE)
                 .and_then(|v| v.to_str().ok())
-                .unwrap_or("application/octet-stream").to_string();
+                .unwrap_or("application/octet-stream")
+                .to_string();
             let content_length: u64 = headers
                 .get(CONTENT_LENGTH)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(payload.len() as u64);
-            let etag = headers.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            let etag = headers
+                .get(ETAG)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
             let last_modified = headers
                 .get(LAST_MODIFIED)
                 .and_then(|v| v.to_str().ok())
@@ -449,16 +516,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Safety checks per registry content section
             if content_length > spec.content.max_payload_size_bytes {
-                return Err(format!("Payload too large: {} > {}", content_length, spec.content.max_payload_size_bytes).into());
+                return Err(format!(
+                    "Payload too large: {} > {}",
+                    content_length, spec.content.max_payload_size_bytes
+                )
+                .into());
             }
-            let content_type_base = content_type.split(';').next().unwrap_or("").trim().to_string();
-            if !spec.content.allowed_mime_types.iter().any(|m| m == &content_type_base) {
+            let content_type_base = content_type
+                .split(';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !spec
+                .content
+                .allowed_mime_types
+                .iter()
+                .any(|m| m == &content_type_base)
+            {
                 return Err(format!(
                     "MIME '{}' not in allow-list {:?}",
                     content_type, spec.content.allowed_mime_types
-                ).into());
+                )
+                .into());
             }
-
 
             // Compute checksum and idempotency key
             let sha_hex = {
@@ -467,33 +548,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 h.update(&payload);
                 hex::encode(h.finalize())
             };
-            let idk = compute_idempotency_key(&spec.source_id, &ep.url, etag.as_deref(), last_modified.as_deref(), &sha_hex);
+            let idk = compute_idempotency_key(
+                &spec.source_id,
+                &ep.url,
+                etag.as_deref(),
+                last_modified.as_deref(),
+                &sha_hex,
+            );
 
             // Build envelope
             let env = EnvelopeSubmissionV1 {
                 envelope_version: "1.0.0".to_string(),
                 source_id: spec.source_id.clone(),
                 idempotency_key: idk,
-                payload_meta: PayloadMeta { mime_type: content_type, size_bytes: content_length, checksum: ChecksumMeta { sha256: sha_hex } },
-                request: RequestMeta { url: ep.url.clone(), method: ep.method.clone(), status: Some(status), etag, last_modified },
-                timing: TimingMeta { fetched_at: Utc::now(), gateway_received_at: None },
-                legal: LegalMeta { license_id: spec.policy.license_id.clone() },
+                payload_meta: PayloadMeta {
+                    mime_type: content_type,
+                    size_bytes: content_length,
+                    checksum: ChecksumMeta { sha256: sha_hex },
+                },
+                request: RequestMeta {
+                    url: ep.url.clone(),
+                    method: ep.method.clone(),
+                    status: Some(status),
+                    etag,
+                    last_modified,
+                },
+                timing: TimingMeta {
+                    fetched_at: Utc::now(),
+                    gateway_received_at: None,
+                },
+                legal: LegalMeta {
+                    license_id: spec.policy.license_id.clone(),
+                },
             };
 
             // Accept via gateway shim
             let gw = Gateway::new(data_root_path_from_arg(&data_root));
-            let stamped = gw.accept(env, &payload).map_err(|e| format!("Gateway accept failed: {e}"))?;
+            let stamped = gw
+                .accept(env, &payload)
+                .map_err(|e| format!("Gateway accept failed: {e}"))?;
 
             // Update cadence marker
             {
-                let meta = crate::ingest_meta::IngestMeta::open_at_root(data_root_path_from_arg(&data_root))?;
+                let meta = crate::ingest_meta::IngestMeta::open_at_root(data_root_path_from_arg(
+                    &data_root,
+                ))?;
                 let now = chrono::Utc::now().timestamp();
                 let _ = meta.set_last_fetched_at(&stamped.envelope.source_id, now);
             }
 
-            println!("✅ Accepted envelope {} with payload {}", stamped.envelope_id, stamped.payload_ref);
-            println!("📄 Ingest log: {}/ingest_log/ingest.ndjson", data_root_path_from_arg(&data_root).display());
-            println!("📦 CAS root: {}/cas", data_root_path_from_arg(&data_root).display());
+            println!(
+                "✅ Accepted envelope {} with payload {}",
+                stamped.envelope_id, stamped.payload_ref
+            );
+            println!(
+                "📄 Ingest log: {}/ingest_log/ingest.ndjson",
+                data_root_path_from_arg(&data_root).display()
+            );
+            println!(
+                "📦 CAS root: {}/cas",
+                data_root_path_from_arg(&data_root).display()
+            );
         }
         Commands::IngestLog { cmd } => {
             use crate::ingest_log_reader::IngestLogReader;
@@ -502,27 +617,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match cmd {
                 IngestLogCmd::Read { consumer, max } => {
                     let (lines, last) = reader.read_next(&consumer, max)?;
-                    for l in lines { println!("{}", l); }
-                    if let Some(id) = last { eprintln!("last_envelope_id={}", id); }
+                    for l in lines {
+                        println!("{}", l);
+                    }
+                    if let Some(id) = last {
+                        eprintln!("last_envelope_id={}", id);
+                    }
                 }
-                IngestLogCmd::Ack { consumer, envelope_id } => {
+                IngestLogCmd::Ack {
+                    consumer,
+                    envelope_id,
+                } => {
                     let off = reader.ack_through(&consumer, &envelope_id)?;
-                    println!("ack_ok consumer={} file={} offset={} envelope_id={}", consumer, off.file, off.byte_offset, off.envelope_id.unwrap_or_default());
+                    println!(
+                        "ack_ok consumer={} file={} offset={} envelope_id={}",
+                        consumer,
+                        off.file,
+                        off.byte_offset,
+                        off.envelope_id.unwrap_or_default()
+                    );
                 }
                 IngestLogCmd::Status { consumer } => {
                     let (off, end, lag) = reader.status(&consumer)?;
-                    println!("consumer={} file={} offset={} last_envelope_id={} end={} lag_bytes={}", consumer, off.file, off.byte_offset, off.envelope_id.unwrap_or_default(), end, lag);
+                    println!(
+                        "consumer={} file={} offset={} last_envelope_id={} end={} lag_bytes={}",
+                        consumer,
+                        off.file,
+                        off.byte_offset,
+                        off.envelope_id.unwrap_or_default(),
+                        end,
+                        lag
+                    );
                 }
                 IngestLogCmd::Resolve { envelope_id } => {
                     if let Some(line) = reader.find_envelope_by_id(&envelope_id)? {
-                        let val: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
+                        let val: serde_json::Value =
+                            serde_json::from_str(&line).unwrap_or_default();
                         if let Some(pref) = val.get("payload_ref").and_then(|v| v.as_str()) {
                             if let Some(path) = reader.resolve_payload_path(pref) {
                                 println!("{}", path.display());
                             } else {
                                 println!("could_not_resolve_payload_path");
                             }
-                        } else if let Some(env) = val.get("envelope").and_then(|e| e.get("payload_ref")).and_then(|v| v.as_str()) {
+                        } else if let Some(env) = val
+                            .get("envelope")
+                            .and_then(|e| e.get("payload_ref"))
+                            .and_then(|v| v.as_str())
+                        {
                             if let Some(path) = reader.resolve_payload_path(env) {
                                 println!("{}", path.display());
                             } else {
@@ -537,16 +678,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        Commands::Parse { consumer, max, data_root, output, source_id } => {
+        Commands::Parse {
+            consumer,
+            max,
+            data_root,
+            output,
+            source_id,
+        } => {
             use crate::ingest_log_reader::IngestLogReader;
-            use crate::parser::{ParsedRecord, Parser, WixCalendarV1Parser, WixWarmupV1Parser, DarrellsHtmlV1Parser};
+            use crate::parser::{
+                DarrellsHtmlV1Parser, ParsedRecord, Parser, WixCalendarV1Parser, WixWarmupV1Parser,
+            };
             use crate::registry::load_source_spec;
             use std::fs::OpenOptions;
             use std::io::Write;
             use std::path::Path;
             use tracing::{debug, error, info, warn};
 
-            info!("parser: starting parse run consumer={} data_root={} output={} max={}", consumer, data_root, output, max);
+            info!(
+                "parser: starting parse run consumer={} data_root={} output={} max={}",
+                consumer, data_root, output, max
+            );
             let reader = IngestLogReader::new(data_root_path_from_arg(&data_root));
             let (lines, _last) = reader.read_next(&consumer, max)?;
             info!("parser: read {} log lines from ingest log", lines.len());
@@ -556,17 +708,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let h = histogram!("sms_parse_loglines_per_run");
                 h.record(lines.len() as f64);
             }
-            if lines.is_empty() { println!("no_envelopes"); return Ok(()); }
+            if lines.is_empty() {
+                println!("no_envelopes");
+                return Ok(());
+            }
 
             // Build per-run output filename with datetime prefix
             let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
             let base_out = Path::new(&output);
             let dir = base_out.parent().unwrap_or(Path::new("."));
-            let file = base_out.file_name().unwrap_or_else(|| std::ffi::OsStr::new("parsed.ndjson"));
+            let file = base_out
+                .file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new("parsed.ndjson"));
             let prefixed_path = dir.join(format!("{}_{}", ts, file.to_string_lossy()));
             // Ensure directory exists
             std::fs::create_dir_all(dir)?;
-            let mut out = OpenOptions::new().create(true).write(true).truncate(true).open(&prefixed_path)?;
+            let mut out = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&prefixed_path)?;
 
             let mut total_seen = 0usize;
             let mut total_filtered = 0usize;
@@ -577,14 +738,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 total_seen += 1;
                 let val: serde_json::Value = match serde_json::from_str(&line) {
                     Ok(v) => v,
-                    Err(e) => { warn!("parser: skipping invalid JSON line: {}", e); continue; }
+                    Err(e) => {
+                        warn!("parser: skipping invalid JSON line: {}", e);
+                        continue;
+                    }
                 };
-                let mut payload_ref_s = val.get("payload_ref").and_then(|v| v.as_str())
-                    .or_else(|| val.get("envelope").and_then(|e| e.get("payload_ref")).and_then(|v| v.as_str()))
+                let mut payload_ref_s = val
+                    .get("payload_ref")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| {
+                        val.get("envelope")
+                            .and_then(|e| e.get("payload_ref"))
+                            .and_then(|v| v.as_str())
+                    })
                     .unwrap_or("")
                     .to_string();
-                let envelope_id = val.get("envelope_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let src_id = val.get("envelope").and_then(|e| e.get("source_id")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let envelope_id = val
+                    .get("envelope_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let src_id = val
+                    .get("envelope")
+                    .and_then(|e| e.get("source_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 {
                     let c = counter!("sms_parse_envelopes_seen_total");
                     c.increment(1);
@@ -595,29 +774,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some(dedupe_of) = val.get("dedupe_of").and_then(|v| v.as_str()) {
                         let rdr = IngestLogReader::new(data_root_path_from_arg(&data_root));
                         if let Ok(Some(orig_line)) = rdr.find_envelope_by_id(dedupe_of) {
-                            if let Ok(orig_val) = serde_json::from_str::<serde_json::Value>(&orig_line) {
-                                if let Some(pr) = orig_val.get("payload_ref").and_then(|v| v.as_str())
-                                    .or_else(|| orig_val.get("envelope").and_then(|e| e.get("payload_ref")).and_then(|v| v.as_str())) {
+                            if let Ok(orig_val) =
+                                serde_json::from_str::<serde_json::Value>(&orig_line)
+                            {
+                                if let Some(pr) = orig_val
+                                    .get("payload_ref")
+                                    .and_then(|v| v.as_str())
+                                    .or_else(|| {
+                                        orig_val
+                                            .get("envelope")
+                                            .and_then(|e| e.get("payload_ref"))
+                                            .and_then(|v| v.as_str())
+                                    })
+                                {
                                     info!("parser: resolved dedupe envelope_id={} to original {} with payload_ref present", envelope_id, dedupe_of);
                                     payload_ref_s = pr.to_string();
                                 } else {
-                                    warn!("parser: original dedupe_of={} has no payload_ref", dedupe_of);
+                                    warn!(
+                                        "parser: original dedupe_of={} has no payload_ref",
+                                        dedupe_of
+                                    );
                                 }
                             }
                         } else {
-                            warn!("parser: could not resolve dedupe_of={} for envelope_id={}", dedupe_of, envelope_id);
+                            warn!(
+                                "parser: could not resolve dedupe_of={} for envelope_id={}",
+                                dedupe_of, envelope_id
+                            );
                         }
                     }
                 }
                 // If still empty, synthesize payload_ref from checksum in envelope metadata
                 if payload_ref_s.is_empty() {
-                    if let Some(sha) = val.get("envelope")
+                    if let Some(sha) = val
+                        .get("envelope")
                         .and_then(|e| e.get("payload_meta"))
                         .and_then(|pm| pm.get("checksum"))
                         .and_then(|c| c.get("sha256"))
-                        .and_then(|s| s.as_str()) {
+                        .and_then(|s| s.as_str())
+                    {
                         payload_ref_s = format!("cas:sha256:{}", sha);
-                        info!("parser: synthesized payload_ref from checksum for envelope_id={}", envelope_id);
+                        info!(
+                            "parser: synthesized payload_ref from checksum for envelope_id={}",
+                            envelope_id
+                        );
                     }
                 }
 
@@ -637,9 +837,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 // Resolve bytes from CAS (Supabase public URL if configured; else local path)
-                let bytes = if (std::env::var("SUPABASE_URL").is_ok() || std::env::var("SUPABASE_PROJECT_REF").is_ok()) && std::env::var("SUPABASE_BUCKET").is_ok() {
+                let bytes = if (std::env::var("SUPABASE_URL").is_ok()
+                    || std::env::var("SUPABASE_PROJECT_REF").is_ok())
+                    && std::env::var("SUPABASE_BUCKET").is_ok()
+                {
                     let project_ref = std::env::var("SUPABASE_PROJECT_REF").ok();
-                    let supabase_url = std::env::var("SUPABASE_URL").ok().or_else(|| project_ref.map(|r| format!("https://{}.supabase.co", r))).unwrap();
+                    let supabase_url = std::env::var("SUPABASE_URL")
+                        .ok()
+                        .or_else(|| project_ref.map(|r| format!("https://{}.supabase.co", r)))
+                        .unwrap();
                     let bucket = std::env::var("SUPABASE_BUCKET").unwrap();
                     let prefix = std::env::var("SUPABASE_PREFIX").unwrap_or_default();
 
@@ -647,19 +853,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let key = if prefix.is_empty() {
                         format!("sha256/{}/{}/{}", &hex[0..2], &hex[2..4], hex)
                     } else {
-                        format!("{}/sha256/{}/{}/{}", prefix.trim_end_matches('/'), &hex[0..2], &hex[2..4], hex)
+                        format!(
+                            "{}/sha256/{}/{}/{}",
+                            prefix.trim_end_matches('/'),
+                            &hex[0..2],
+                            &hex[2..4],
+                            hex
+                        )
                     };
                     let base = supabase_url.trim_end_matches('/');
                     let client = reqwest::Client::new();
                     // First try public URL
-                    let public_url = format!("{}/storage/v1/object/public/{}/{}", base, bucket, key);
+                    let public_url =
+                        format!("{}/storage/v1/object/public/{}/{}", base, bucket, key);
                     debug!("parser: fetching payload via supabase public_url for envelope_id={} src_id={} key={}", envelope_id, src_id, key);
                     let mut resp = client.get(public_url).send().await?;
                     if !resp.status().is_success() {
                         // Fallback to authenticated URL in case bucket isn't public
                         let auth_url = format!("{}/storage/v1/object/{}/{}", base, bucket, key);
-                        if let Ok(key_hdr) = std::env::var("SUPABASE_SERVICE_ROLE_KEY").or_else(|_| std::env::var("SUPABASE_ANON_KEY")) {
-                            debug!("parser: retrying supabase auth_url for envelope_id={} status={} ", envelope_id, resp.status().as_u16());
+                        if let Ok(key_hdr) = std::env::var("SUPABASE_SERVICE_ROLE_KEY")
+                            .or_else(|_| std::env::var("SUPABASE_ANON_KEY"))
+                        {
+                            debug!(
+                                "parser: retrying supabase auth_url for envelope_id={} status={} ",
+                                envelope_id,
+                                resp.status().as_u16()
+                            );
                             resp = client
                                 .get(auth_url)
                                 .header("Authorization", format!("Bearer {}", key_hdr))
@@ -668,9 +887,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .await?;
                         }
                     }
-                    if !resp.status().is_success() { error!("parser: fetch_bytes_failed envelope_id={} status={}", envelope_id, resp.status().as_u16()); return Err(format!("fetch_bytes_failed: {}", resp.status()).into()); }
+                    if !resp.status().is_success() {
+                        error!(
+                            "parser: fetch_bytes_failed envelope_id={} status={}",
+                            envelope_id,
+                            resp.status().as_u16()
+                        );
+                        return Err(format!("fetch_bytes_failed: {}", resp.status()).into());
+                    }
                     let b = resp.bytes().await?.to_vec();
-                    debug!("parser: fetched bytes via supabase envelope_id={} len={} ", envelope_id, b.len());
+                    debug!(
+                        "parser: fetched bytes via supabase envelope_id={} len={} ",
+                        envelope_id,
+                        b.len()
+                    );
                     let h = histogram!("sms_parse_resolved_payload_bytes");
                     h.record(b.len() as f64);
                     b
@@ -681,32 +911,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let h = histogram!("sms_parse_resolved_payload_bytes");
                         h.record(b.len() as f64);
                         b
-                    } else { warn!("parser: could not resolve payload path for envelope_id={} payload_ref={}", envelope_id, payload_ref_s); let c = counter!("sms_parse_resolve_payload_errors_total"); c.increment(1); continue }
+                    } else {
+                        warn!("parser: could not resolve payload path for envelope_id={} payload_ref={}", envelope_id, payload_ref_s);
+                        let c = counter!("sms_parse_resolve_payload_errors_total");
+                        c.increment(1);
+                        continue;
+                    }
                 };
-                debug!("parser: resolved payload bytes for envelope_id={} len={}", envelope_id, bytes.len());
+                debug!(
+                    "parser: resolved payload bytes for envelope_id={} len={}",
+                    envelope_id,
+                    bytes.len()
+                );
 
                 // Choose parser by parse_plan_ref from registry
                 let base = Path::new(env!("CARGO_MANIFEST_DIR"));
-                let reg_path = base.join("registry/sources").join(format!("{}.json", src_id));
+                let reg_path = base
+                    .join("registry/sources")
+                    .join(format!("{}.json", src_id));
                 let spec = load_source_spec(&reg_path)?;
-                let plan = spec.parse_plan_ref.clone().unwrap_or_else(|| "parse_plan:wix_calendar_v1".to_string());
-                info!("parser: parsing envelope_id={} src_id={} plan={} bytes={}", envelope_id, src_id, plan, bytes.len());
+                let plan = spec
+                    .parse_plan_ref
+                    .clone()
+                    .unwrap_or_else(|| "parse_plan:wix_calendar_v1".to_string());
+                info!(
+                    "parser: parsing envelope_id={} src_id={} plan={} bytes={}",
+                    envelope_id,
+                    src_id,
+                    plan,
+                    bytes.len()
+                );
                 let parse_t0 = std::time::Instant::now();
                 let recs: Vec<ParsedRecord> = match spec.parse_plan_ref.as_deref() {
                     Some("parse_plan:wix_calendar_v1") | None => {
-                        let p = WixCalendarV1Parser::new(src_id.clone(), envelope_id.clone(), payload_ref_s.to_string());
+                        let p = WixCalendarV1Parser::new(
+                            src_id.clone(),
+                            envelope_id.clone(),
+                            payload_ref_s.to_string(),
+                        );
                         p.parse(&bytes)?
                     }
                     Some("parse_plan:wix_warmup_v1") => {
-                        let p = WixWarmupV1Parser::new(src_id.clone(), envelope_id.clone(), payload_ref_s.to_string());
+                        let p = WixWarmupV1Parser::new(
+                            src_id.clone(),
+                            envelope_id.clone(),
+                            payload_ref_s.to_string(),
+                        );
                         p.parse(&bytes)?
                     }
                     Some("parse_plan:darrells_html_v1") => {
-                        let p = DarrellsHtmlV1Parser::new(src_id.clone(), envelope_id.clone(), payload_ref_s.to_string());
+                        let p = DarrellsHtmlV1Parser::new(
+                            src_id.clone(),
+                            envelope_id.clone(),
+                            payload_ref_s.to_string(),
+                        );
                         p.parse(&bytes)?
                     }
                     Some(other) => {
-                        warn!("parser: skipping envelope {} with unsupported parse plan {}", envelope_id, other);
+                        warn!(
+                            "parser: skipping envelope {} with unsupported parse plan {}",
+                            envelope_id, other
+                        );
                         Vec::new()
                     }
                 };
@@ -715,12 +980,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let hpd = histogram!("sms_parse_duration_seconds");
                 hpd.record(parse_secs);
                 if recs.is_empty() {
-                    warn!("parser: parser produced 0 records for envelope_id={} src_id={} plan={}", envelope_id, src_id, plan);
+                    warn!(
+                        "parser: parser produced 0 records for envelope_id={} src_id={} plan={}",
+                        envelope_id, src_id, plan
+                    );
                     total_empty_records += 1;
                     let c = counter!("sms_parse_empty_record_envelopes_total");
                     c.increment(1);
                 } else {
-                    debug!("parser: writing {} records for envelope_id={}", recs.len(), envelope_id);
+                    debug!(
+                        "parser: writing {} records for envelope_id={}",
+                        recs.len(),
+                        envelope_id
+                    );
                 }
 
                 for r in recs.clone() {
