@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use tracing::{error, info, warn};
 // Import metrics macros from the external crate explicitly to avoid collision with local `metrics` module
 use ::metrics::{counter, histogram};
+use crate::architecture::application::HttpClientPort;
 
 mod apis;
 mod carpenter;
@@ -420,6 +421,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             data_root,
             bypass_cadence,
         } => {
+            use crate::architecture::application::UseCases;
+            use crate::architecture::infrastructure::{MetricsForwarder, ReqwestHttpClient};
             use crate::envelope::{
                 ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
             };
@@ -427,7 +430,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use crate::idempotency::compute_idempotency_key;
             use crate::registry::load_source_spec;
             use chrono::Utc;
-            use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 
             let source = source_id.unwrap_or_else(|| constants::BLUE_MOON_API.to_string());
             if bypass_cadence {
@@ -483,46 +485,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 concurrency: spec.rate_limits.concurrency.map(|c| c.max(1)),
             });
 
-            let client = reqwest::Client::new();
+            // Use the new HTTP adapter through the port
+            let http = std::sync::Arc::new(ReqwestHttpClient);
+            let metrics = std::sync::Arc::new(MetricsForwarder);
+
             // Acquire for the request; we don't know size yet, so do RPM/concurrency before send
             rl.acquire(0).await;
-            let resp = client.get(&ep.url).send().await?;
-            let status = resp.status().as_u16();
-            let headers = resp.headers().clone();
-            let bytes = resp.bytes().await?;
-            let payload = bytes.to_vec();
+            let resp = HttpClientPort::get(&*http, &ep.url).await.map_err(|e| anyhow::anyhow!(e))?;
 
             // Account for bytes after we know the size
-            rl.acquire(payload.len() as u64).await;
-
-            let content_type = headers
-                .get(CONTENT_TYPE)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("application/octet-stream")
-                .to_string();
-            let content_length: u64 = headers
-                .get(CONTENT_LENGTH)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(payload.len() as u64);
-            let etag = headers
-                .get(ETAG)
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string());
-            let last_modified = headers
-                .get(LAST_MODIFIED)
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string());
+            rl.acquire(resp.content_length as u64).await;
 
             // Safety checks per registry content section
-            if content_length > spec.content.max_payload_size_bytes {
+            if resp.content_length > spec.content.max_payload_size_bytes {
                 return Err(format!(
                     "Payload too large: {} > {}",
-                    content_length, spec.content.max_payload_size_bytes
+                    resp.content_length, spec.content.max_payload_size_bytes
                 )
                 .into());
             }
-            let content_type_base = content_type
+            let content_type_base = resp
+                .content_type
                 .split(';')
                 .next()
                 .unwrap_or("")
@@ -536,7 +519,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             {
                 return Err(format!(
                     "MIME '{}' not in allow-list {:?}",
-                    content_type, spec.content.allowed_mime_types
+                    resp.content_type, spec.content.allowed_mime_types
                 )
                 .into());
             }
@@ -545,14 +528,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let sha_hex = {
                 use sha2::{Digest, Sha256};
                 let mut h = Sha256::new();
-                h.update(&payload);
+                h.update(&resp.bytes);
                 hex::encode(h.finalize())
             };
             let idk = compute_idempotency_key(
                 &spec.source_id,
                 &ep.url,
-                etag.as_deref(),
-                last_modified.as_deref(),
+                resp.etag.as_deref(),
+                resp.last_modified.as_deref(),
                 &sha_hex,
             );
 
@@ -562,16 +545,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 source_id: spec.source_id.clone(),
                 idempotency_key: idk,
                 payload_meta: PayloadMeta {
-                    mime_type: content_type,
-                    size_bytes: content_length,
+                    mime_type: resp.content_type.clone(),
+                    size_bytes: resp.content_length,
                     checksum: ChecksumMeta { sha256: sha_hex },
                 },
                 request: RequestMeta {
                     url: ep.url.clone(),
                     method: ep.method.clone(),
-                    status: Some(status),
-                    etag,
-                    last_modified,
+                    status: Some(resp.status),
+                    etag: resp.etag.clone(),
+                    last_modified: resp.last_modified.clone(),
                 },
                 timing: TimingMeta {
                     fetched_at: Utc::now(),
@@ -585,7 +568,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Accept via gateway shim
             let gw = Gateway::new(data_root_path_from_arg(&data_root));
             let stamped = gw
-                .accept(env, &payload)
+                .accept(env, &resp.bytes)
                 .map_err(|e| format!("Gateway accept failed: {e}"))?;
 
             // Update cadence marker

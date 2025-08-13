@@ -37,9 +37,20 @@ pub mod application {
     }
 
     #[allow(dead_code)]
+    #[derive(Clone, Debug)]
+    pub struct HttpGetResponse {
+        pub bytes: Vec<u8>,
+        pub content_type: String,
+        pub content_length: u64,
+        pub etag: Option<String>,
+        pub last_modified: Option<String>,
+        pub status: u16,
+    }
+
+    #[allow(dead_code)]
     #[async_trait::async_trait]
     pub trait HttpClientPort: Send + Sync {
-        async fn get(&self, url: &str) -> Result<(Vec<u8>, String /* content_type */), String>;
+        async fn get(&self, url: &str) -> Result<HttpGetResponse, String>;
     }
 
     #[allow(dead_code)]
@@ -49,8 +60,8 @@ pub mod application {
 
     #[allow(dead_code)]
     pub trait MetricsPort: Send + Sync {
-        fn incr(&self, name: &str, value: u64);
-        fn observe(&self, name: &str, value: f64);
+        fn incr(&self, name: &'static str, value: u64);
+        fn observe(&self, name: &'static str, value: f64);
     }
 
     #[allow(dead_code)]
@@ -79,26 +90,26 @@ pub mod application {
             let t0 = std::time::Instant::now();
             self.metrics.incr("ingest_attempts", 1);
 
-            let (bytes, content_type) = self.http.get(url).await?;
-            let size = bytes.len() as u64;
+            let resp = self.http.get(url).await?;
+            let size = resp.bytes.len() as u64;
 
             // Compute sha256 for content addressing
             let sha256_hex = {
                 use sha2::{Digest, Sha256};
                 let mut h = Sha256::new();
-                h.update(&bytes);
+                h.update(&resp.bytes);
                 hex::encode(h.finalize())
             };
             let payload_ref = format!("cas:sha256:{}", sha256_hex);
 
             // Save payload first (idempotent at storage layer if already present)
-            self.storage.save_raw(&sha256_hex, bytes).await?;
+            self.storage.save_raw(&sha256_hex, resp.bytes).await?;
 
             // Record envelope-like entry and get logical envelope_id back
             let meta = ContentMeta {
                 url: url.to_string(),
                 method: method.to_string(),
-                content_type,
+                content_type: resp.content_type,
                 content_length: size,
                 sha256_hex: sha256_hex.clone(),
             };
@@ -114,6 +125,51 @@ pub mod application {
 
 pub mod infrastructure {
     // Adapters that will implement application ports using concrete tech (reqwest, fs, db, etc.)
+    use super::application::{HttpClientPort, HttpGetResponse, MetricsPort};
+
+    pub struct ReqwestHttpClient;
+
+    #[async_trait::async_trait]
+    impl HttpClientPort for ReqwestHttpClient {
+        async fn get(&self, url: &str) -> Result<HttpGetResponse, String> {
+            use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
+            let client = reqwest::Client::new();
+            let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+            let status = resp.status().as_u16();
+            let headers = resp.headers().clone();
+            let bytes = resp.bytes().await.map_err(|e| e.to_string())?.to_vec();
+
+            let content_type = headers
+                .get(CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/octet-stream")
+                .to_string();
+            let content_length: u64 = headers
+                .get(CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(bytes.len() as u64);
+            let etag = headers.get(ETAG).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            let last_modified = headers
+                .get(LAST_MODIFIED)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
+            Ok(HttpGetResponse { bytes, content_type, content_length, etag, last_modified, status })
+        }
+    }
+
+    pub struct MetricsForwarder;
+    impl MetricsPort for MetricsForwarder {
+        fn incr(&self, name: &'static str, value: u64) {
+            let c = ::metrics::counter!(name);
+            c.increment(value);
+        }
+        fn observe(&self, name: &'static str, value: f64) {
+            let h = ::metrics::histogram!(name);
+            h.record(value);
+        }
+    }
 }
 
 pub mod interface {
