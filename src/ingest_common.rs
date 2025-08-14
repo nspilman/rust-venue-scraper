@@ -1,15 +1,21 @@
-use crate::envelope::{ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta};
+use crate::envelope::{
+    ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
+};
 use crate::error::{Result, ScraperError};
 use crate::gateway::Gateway;
 use crate::idempotency::compute_idempotency_key;
 use crate::ingest_meta::IngestMeta;
 use crate::rate_limiter::{Limits, RateLimiter};
 use crate::registry::load_source_spec;
+// Note: accessing metrics from the main binary
+use crate::metrics::{
+    gateway::GatewayMetrics, ingest_log::IngestLogMetrics, sources::CadenceResult,
+    sources::SourcesMetrics,
+};
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use std::path::Path;
-use tracing::debug;
 use std::time::Instant;
-use metrics::{counter, histogram};
+use tracing::debug;
 
 /// Fetch payload bytes for a source defined in the registry and persist an ingest envelope via the gateway.
 ///
@@ -20,36 +26,57 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let reg_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("registry/sources")
         .join(format!("{}.json", source_id));
-    let spec = load_source_spec(&reg_path)
-        .map_err(|e| ScraperError::Api { message: format!("Failed to load registry for {}: {}", source_id, e) })?;
+
+    let spec = match load_source_spec(&reg_path) {
+        Ok(spec) => {
+            SourcesMetrics::record_registry_load_success(source_id);
+            spec
+        }
+        Err(e) => {
+            SourcesMetrics::record_registry_load_error(source_id, "load_failed");
+            return Err(ScraperError::Api {
+                message: format!("Failed to load registry for {}: {}", source_id, e),
+            });
+        }
+    };
+
     if !spec.enabled {
-        return Err(ScraperError::Api { message: format!("Source {} is disabled in registry", source_id) });
+        return Err(ScraperError::Api {
+            message: format!("Source {} is disabled in registry", source_id),
+        });
     }
-    let ep = spec
-        .endpoints
-        .first()
-        .ok_or_else(|| ScraperError::Api { message: "No endpoint in registry".into() })?;
+    let ep = spec.endpoints.first().ok_or_else(|| ScraperError::Api {
+        message: "No endpoint in registry".into(),
+    })?;
 
     // 2) Cadence: enforce at most twice/day per source (unless bypassed)
     let data_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
-{
-        let c = counter!("sms_cadence_checks_total");
-        c.increment(1);
-    }
-    let bypass_cadence = std::env::var("SMS_BYPASS_CADENCE").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let bypass_cadence = std::env::var("SMS_BYPASS_CADENCE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
     if !bypass_cadence {
-        let meta = IngestMeta::open_at_root(&data_root)
-            .map_err(|e| ScraperError::Api { message: format!("meta open failed: {}", e) })?;
+        let meta = IngestMeta::open_at_root(&data_root).map_err(|e| ScraperError::Api {
+            message: format!("meta open failed: {}", e),
+        })?;
         let now = chrono::Utc::now().timestamp();
         let min_interval_secs: i64 = 12 * 60 * 60;
-        if let Some(last) = meta
-            .get_last_fetched_at(&spec.source_id)
-            .map_err(|e| ScraperError::Api { message: format!("meta read failed: {}", e) })?
+        if let Some(last) =
+            meta.get_last_fetched_at(&spec.source_id)
+                .map_err(|e| ScraperError::Api {
+                    message: format!("meta read failed: {}", e),
+                })?
         {
             if now - last < min_interval_secs {
-                return Err(ScraperError::Api { message: "cadence_skip: fetched within last 12h".into() });
+                SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Skipped);
+                return Err(ScraperError::Api {
+                    message: "cadence_skip: fetched within last 12h".into(),
+                });
             }
         }
+        SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Allowed);
+    } else {
+        SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Bypassed);
     }
 
     // 3) Fetch bytes and headers with rate limiting per registry
@@ -68,18 +95,12 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let payload = bytes.to_vec();
     rl.acquire(payload.len() as u64).await; // account for bytes after size known
 
-    // Metrics: fetch duration and payload size
+    // Record metrics using the structured metrics system
     let dur = fetch_t0.elapsed().as_secs_f64();
-    let h_dur = histogram!("sms_fetch_duration_seconds");
-    h_dur.record(dur);
-    let h_bytes = histogram!("sms_fetch_payload_bytes");
-    h_bytes.record(payload.len() as f64);
     if (200..=299).contains(&status) {
-        let c = counter!("sms_fetch_success_total");
-        c.increment(1);
+        SourcesMetrics::record_request_success(&spec.source_id, dur, payload.len());
     } else {
-        let c = counter!("sms_fetch_error_total");
-        c.increment(1);
+        SourcesMetrics::record_request_error(&spec.source_id, "http_error");
     }
 
     let content_type = headers
@@ -103,22 +124,31 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
 
     // 4) Safety checks against registry
     if content_length > spec.content.max_payload_size_bytes {
-        return Err(ScraperError::Api { message: format!(
-            "Payload too large: {} > {}",
-            content_length, spec.content.max_payload_size_bytes
-        )});
+        return Err(ScraperError::Api {
+            message: format!(
+                "Payload too large: {} > {}",
+                content_length, spec.content.max_payload_size_bytes
+            ),
+        });
     }
-    let content_type_base = content_type.split(';').next().unwrap_or("").trim().to_string();
+    let content_type_base = content_type
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
     if !spec
         .content
         .allowed_mime_types
         .iter()
         .any(|m| m == &content_type_base)
     {
-        return Err(ScraperError::Api { message: format!(
-            "MIME '{}' not in allow-list {:?}",
-            content_type, spec.content.allowed_mime_types
-        )});
+        return Err(ScraperError::Api {
+            message: format!(
+                "MIME '{}' not in allow-list {:?}",
+                content_type, spec.content.allowed_mime_types
+            ),
+        });
     }
 
     // 5) Compute checksum and idempotency key
@@ -141,26 +171,60 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
         envelope_version: "1.0.0".to_string(),
         source_id: spec.source_id.clone(),
         idempotency_key: idk,
-        payload_meta: PayloadMeta { mime_type: content_type, size_bytes: content_length, checksum: ChecksumMeta { sha256: sha_hex } },
-        request: RequestMeta { url: ep.url.clone(), method: ep.method.clone(), status: Some(status), etag, last_modified },
-        timing: TimingMeta { fetched_at: chrono::Utc::now(), gateway_received_at: None },
-        legal: LegalMeta { license_id: spec.policy.license_id.clone() },
+        payload_meta: PayloadMeta {
+            mime_type: content_type,
+            size_bytes: content_length,
+            checksum: ChecksumMeta { sha256: sha_hex },
+        },
+        request: RequestMeta {
+            url: ep.url.clone(),
+            method: ep.method.clone(),
+            status: Some(status),
+            etag,
+            last_modified,
+        },
+        timing: TimingMeta {
+            fetched_at: chrono::Utc::now(),
+            gateway_received_at: None,
+        },
+        legal: LegalMeta {
+            license_id: spec.policy.license_id.clone(),
+        },
     };
 
     let gw = Gateway::new(data_root.clone());
-    let stamped = gw
-        .accept(env, &payload)
-        .map_err(|e| ScraperError::Api { message: format!("Gateway accept failed: {}", e) })?;
-    debug!("Accepted envelope {} with payload {}", stamped.envelope_id, stamped.payload_ref);
+    let accept_start = Instant::now();
+    let stamped = gw.accept(env, &payload).map_err(|e| {
+        GatewayMetrics::record_cas_write_error("local", "accept_failed");
+        ScraperError::Api {
+            message: format!("Gateway accept failed: {}", e),
+        }
+    })?;
+
+    let accept_duration = accept_start.elapsed().as_secs_f64();
+
+    // Record successful gateway and ingest log metrics
+    GatewayMetrics::record_envelope_accepted(
+        &stamped.envelope.source_id,
+        payload.len(),
+        accept_duration,
+    );
+    GatewayMetrics::record_cas_write_success("local", payload.len());
+    IngestLogMetrics::record_write_success(payload.len());
+
+    debug!(
+        "Accepted envelope {} with payload {}",
+        stamped.envelope_id, stamped.payload_ref
+    );
 
     // 7) Update cadence marker
     {
-        let meta = IngestMeta::open_at_root(&data_root)
-            .map_err(|e| ScraperError::Api { message: format!("meta open failed: {}", e) })?;
+        let meta = IngestMeta::open_at_root(&data_root).map_err(|e| ScraperError::Api {
+            message: format!("meta open failed: {}", e),
+        })?;
         let now = chrono::Utc::now().timestamp();
         let _ = meta.set_last_fetched_at(&stamped.envelope.source_id, now);
     }
 
     Ok(payload)
 }
-

@@ -8,7 +8,9 @@ pub struct IngestMeta {
 impl IngestMeta {
     pub fn open_at_root<P: AsRef<Path>>(data_root: P) -> anyhow::Result<Self> {
         let db_path = data_root.as_ref().join("ingest_log").join("meta.db");
-        if let Some(parent) = db_path.parent() { std::fs::create_dir_all(parent)?; }
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let conn = Connection::open(db_path)?;
         conn.execute_batch(
             r#"
@@ -33,7 +35,9 @@ impl IngestMeta {
 
     // Dedupe index
     pub fn get_envelope_by_idk(&self, idk: &str) -> anyhow::Result<Option<String>> {
-        let mut stmt = self.conn.prepare("SELECT envelope_id FROM dedupe_index WHERE idempotency_key = ?1")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT envelope_id FROM dedupe_index WHERE idempotency_key = ?1")?;
         let mut rows = stmt.query(params![idk])?;
         if let Some(row) = rows.next()? {
             let eid: String = row.get(0)?;
@@ -53,7 +57,9 @@ impl IngestMeta {
 
     // Consumer offsets
     pub fn get_offset(&self, consumer: &str) -> anyhow::Result<(u64, Option<String>)> {
-        let mut stmt = self.conn.prepare("SELECT byte_offset, envelope_id FROM consumer_offsets WHERE consumer = ?1")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT byte_offset, envelope_id FROM consumer_offsets WHERE consumer = ?1")?;
         let mut rows = stmt.query(params![consumer])?;
         if let Some(row) = rows.next()? {
             let off: u64 = row.get::<_, i64>(0)? as u64;
@@ -64,7 +70,12 @@ impl IngestMeta {
         }
     }
 
-    pub fn set_offset(&self, consumer: &str, byte_offset: u64, envelope_id: Option<&str>) -> anyhow::Result<()> {
+    pub fn set_offset(
+        &self,
+        consumer: &str,
+        byte_offset: u64,
+        envelope_id: Option<&str>,
+    ) -> anyhow::Result<()> {
         self.conn.execute(
             "INSERT INTO consumer_offsets (consumer, byte_offset, envelope_id) VALUES (?1, ?2, ?3)
              ON CONFLICT(consumer) DO UPDATE SET byte_offset=excluded.byte_offset, envelope_id=excluded.envelope_id",
@@ -75,7 +86,9 @@ impl IngestMeta {
 
     // Simple cadence tracking (e.g., twice a day per source)
     pub fn get_last_fetched_at(&self, source_id: &str) -> anyhow::Result<Option<i64>> {
-        let mut stmt = self.conn.prepare("SELECT last_fetched_at FROM fetch_cadence WHERE source_id = ?1")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT last_fetched_at FROM fetch_cadence WHERE source_id = ?1")?;
         let mut rows = stmt.query(params![source_id])?;
         if let Some(row) = rows.next()? {
             let ts: i64 = row.get(0)?;

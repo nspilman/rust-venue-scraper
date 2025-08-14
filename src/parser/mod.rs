@@ -21,7 +21,11 @@ pub struct WixCalendarV1Parser {
 
 impl WixCalendarV1Parser {
     pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
-        Self { source_id, envelope_id, payload_ref }
+        Self {
+            source_id,
+            envelope_id,
+            payload_ref,
+        }
     }
 }
 
@@ -34,7 +38,10 @@ impl Parser for WixCalendarV1Parser {
         let mut out = Vec::new();
 
         if let Some(events) = v.get("events").and_then(|e| e.as_array()) {
-            info!("WixCalendarV1Parser: found events array count={}", events.len());
+            info!(
+                "WixCalendarV1Parser: found events array count={}",
+                events.len()
+            );
             for ev in events {
                 out.push(ParsedRecord {
                     source_id: self.source_id.clone(),
@@ -66,7 +73,10 @@ impl Parser for WixCalendarV1Parser {
                     }
                 }
             }
-            info!("WixCalendarV1Parser: aggregated events from eventsByDates total={}", total);
+            info!(
+                "WixCalendarV1Parser: aggregated events from eventsByDates total={}",
+                total
+            );
             return Ok(out);
         }
 
@@ -92,7 +102,11 @@ pub struct WixWarmupV1Parser {
 
 impl WixWarmupV1Parser {
     pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
-        Self { source_id, envelope_id, payload_ref }
+        Self {
+            source_id,
+            envelope_id,
+            payload_ref,
+        }
     }
 }
 
@@ -103,7 +117,8 @@ impl Parser for WixWarmupV1Parser {
         debug!("WixWarmupV1Parser: start bytes_len={}", bytes.len());
         let body = String::from_utf8_lossy(bytes).to_string();
         let document = Html::parse_document(&body);
-        let selector = Selector::parse("script[type=\"application/json\"]#wix-warmup-data").unwrap();
+        let selector =
+            Selector::parse("script[type=\"application/json\"]#wix-warmup-data").unwrap();
 
         let mut out = Vec::new();
         if let Some(element) = document.select(&selector).next() {
@@ -115,7 +130,9 @@ impl Parser for WixWarmupV1Parser {
                     if let Some(widgets) = app_data.as_object() {
                         for (widget_key, widget_data) in widgets {
                             if widget_key.starts_with("widget") {
-                                if let Some(events_data) = widget_data.get("events").and_then(|e| e.get("events")) {
+                                if let Some(events_data) =
+                                    widget_data.get("events").and_then(|e| e.get("events"))
+                                {
                                     if let Some(events_array) = events_data.as_array() {
                                         total += events_array.len();
                                         for ev in events_array {
@@ -123,7 +140,10 @@ impl Parser for WixWarmupV1Parser {
                                                 source_id: self.source_id.clone(),
                                                 envelope_id: self.envelope_id.clone(),
                                                 payload_ref: self.payload_ref.clone(),
-                                                record_path: format!("$.appsWarmupData.*.{}.events.events[*]", widget_key),
+                                                record_path: format!(
+                                                    "$.appsWarmupData.*.{}.events.events[*]",
+                                                    widget_key
+                                                ),
                                                 record: ev.clone(),
                                             });
                                         }
@@ -134,10 +154,16 @@ impl Parser for WixWarmupV1Parser {
                     }
                 }
             }
-            info!("WixWarmupV1Parser: extracted total events={} from warmup JSON", total);
+            info!(
+                "WixWarmupV1Parser: extracted total events={} from warmup JSON",
+                total
+            );
         }
         if out.is_empty() {
-            warn!("WixWarmupV1Parser: no events extracted; emitting fallback record with html_len={}", body.len());
+            warn!(
+                "WixWarmupV1Parser: no events extracted; emitting fallback record with html_len={}",
+                body.len()
+            );
             // Fall back: emit entire HTML if nothing parsed for troubleshooting
             out.push(ParsedRecord {
                 source_id: self.source_id.clone(),
@@ -160,23 +186,31 @@ pub struct DarrellsHtmlV1Parser {
 
 impl DarrellsHtmlV1Parser {
     pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
-        Self { source_id, envelope_id, payload_ref }
+        Self {
+            source_id,
+            envelope_id,
+            payload_ref,
+        }
     }
 }
 
 impl Parser for DarrellsHtmlV1Parser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>> {
-        use scraper::{Html, Selector};
         use chrono::{Datelike, NaiveDate};
+        use scraper::{Html, Selector};
         use tracing::{debug, info, warn};
 
         fn parse_date(text: &str) -> Option<NaiveDate> {
             // Expecting like: "MUSIC 7.12" (from earlier logic: header h1 with date)
             let parts: Vec<&str> = text.split_whitespace().collect();
-            if parts.len() < 2 { return None; }
+            if parts.len() < 2 {
+                return None;
+            }
             let date_part = parts[1];
             let comps: Vec<&str> = date_part.split('.').collect();
-            if comps.len() != 2 { return None; }
+            if comps.len() != 2 {
+                return None;
+            }
             let month: u32 = comps[0].parse().ok()?;
             let day: u32 = comps[1].parse().ok()?;
             let year = chrono::Utc::now().year();
@@ -188,14 +222,22 @@ impl Parser for DarrellsHtmlV1Parser {
             let mut performers = Vec::new();
             for link in element.select(&link_sel) {
                 let name = link.text().collect::<String>().trim().to_string();
-                if !name.is_empty() { performers.push(name); }
+                if !name.is_empty() {
+                    performers.push(name);
+                }
             }
             let text_content = element.text().collect::<String>();
             for line in text_content.split('\n') {
                 let line = line.trim();
-                if line.is_empty() { continue; }
-                if performers.iter().any(|p| line.contains(p)) { continue; }
-                if line.contains("DOORS") || line.contains("SHOW") || line.contains("$") { continue; }
+                if line.is_empty() {
+                    continue;
+                }
+                if performers.iter().any(|p| line.contains(p)) {
+                    continue;
+                }
+                if line.contains("DOORS") || line.contains("SHOW") || line.contains("$") {
+                    continue;
+                }
                 performers.push(line.to_string());
             }
             performers
@@ -255,4 +297,3 @@ impl Parser for DarrellsHtmlV1Parser {
         Ok(out)
     }
 }
-

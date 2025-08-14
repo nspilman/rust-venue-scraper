@@ -187,7 +187,7 @@ impl Query {
         offset: Option<i32>,
     ) -> FieldResult<Vec<Event>> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let limit = limit.map(|l| l as usize);
         let offset = offset.map(|o| o as usize);
 
@@ -203,7 +203,10 @@ impl Query {
             .filter(|event| {
                 // Filter by search term in title
                 let title_matches = if let Some(search_term) = &search {
-                    event.title.to_lowercase().contains(&search_term.to_lowercase())
+                    event
+                        .title
+                        .to_lowercase()
+                        .contains(&search_term.to_lowercase())
                 } else {
                     true
                 };
@@ -216,10 +219,11 @@ impl Query {
         if let Some(venue_name) = venue {
             let venue_name_lower = venue_name.to_lowercase();
             let mut events_with_venues = Vec::new();
-            
+
             for event in filtered_events {
                 // Get venue info for this event
-                if let Ok(Some(venue_info)) = context.storage.get_venue_by_id(event.venue_id).await {
+                if let Ok(Some(venue_info)) = context.storage.get_venue_by_id(event.venue_id).await
+                {
                     if venue_info.name.to_lowercase().contains(&venue_name_lower) {
                         events_with_venues.push(event);
                     }

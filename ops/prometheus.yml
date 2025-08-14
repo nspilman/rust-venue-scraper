@@ -4,7 +4,10 @@ global:
 scrape_configs:
   - job_name: 'sms_scraper'
     static_configs:
-      - targets: ['host.docker.internal:9898']
+      # Standardize on 9464 for metrics
+      - targets: ['scraper:9464']
+      # Also scrape a locally running scraper binary on the host (macOS/Windows Docker Desktop)
+      - targets: ['host.docker.internal:9464', 'localhost:9464']
 
   - job_name: 'pushgateway'
     honor_labels: true

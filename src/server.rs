@@ -1,7 +1,8 @@
 use crate::storage::Storage;
-use crate::tasks::{gateway_once, parse_run, GatewayOnceParams, GatewayOnceResult, ParseParams, ParseResultSummary};
+use crate::tasks::{
+    gateway_once, parse_run, GatewayOnceParams, GatewayOnceResult, ParseParams, ParseResultSummary,
+};
 use axum::{
-    extract::State,
     http::Method,
     response::{IntoResponse, Json},
     routing::{get, post},
@@ -10,7 +11,6 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
-
 
 /// Health check endpoint
 async fn health() -> impl IntoResponse {
@@ -31,30 +31,42 @@ pub fn create_server(storage: Arc<dyn Storage>) -> Router {
     Router::new()
         .route("/health", get(health))
         // Admin/task endpoints
-        .route("/admin/gateway-once", post({
-            let st = storage.clone();
-            move |AxumJson(p): AxumJson<GatewayOnceParams>| {
-                let st = st.clone();
-                async move {
-                    match gateway_once(st, p).await {
-                        Ok(res) => AxumJson::<GatewayOnceResult>(res).into_response(),
-                        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        .route(
+            "/admin/gateway-once",
+            post({
+                let st = storage.clone();
+                move |AxumJson(p): AxumJson<GatewayOnceParams>| {
+                    let st = st.clone();
+                    async move {
+                        match gateway_once(st, p).await {
+                            Ok(res) => AxumJson::<GatewayOnceResult>(res).into_response(),
+                            Err(e) => {
+                                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                                    .into_response()
+                            }
+                        }
                     }
                 }
-            }
-        }))
-        .route("/admin/parse", post({
-            let st = storage.clone();
-            move |AxumJson(p): AxumJson<ParseParams>| {
-                let st = st.clone();
-                async move {
-                    match parse_run(st, p).await {
-                        Ok(res) => AxumJson::<ParseResultSummary>(res).into_response(),
-                        Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+            }),
+        )
+        .route(
+            "/admin/parse",
+            post({
+                let st = storage.clone();
+                move |AxumJson(p): AxumJson<ParseParams>| {
+                    let st = st.clone();
+                    async move {
+                        match parse_run(st, p).await {
+                            Ok(res) => AxumJson::<ParseResultSummary>(res).into_response(),
+                            Err(e) => {
+                                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+                                    .into_response()
+                            }
+                        }
                     }
                 }
-            }
-        }))
+            }),
+        )
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(())
 }

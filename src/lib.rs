@@ -1,5 +1,4 @@
 pub mod apis;
-pub mod carpenter;
 pub mod constants;
 #[cfg(feature = "db")]
 pub mod db;
@@ -23,5 +22,12 @@ pub mod rate_limiter;
 pub mod registry;
 pub mod tasks;
 
-// Non-invasive architecture scaffolding to guide future refactors.
-pub mod architecture;
+// New layered boundaries for application and infrastructure
+pub mod app;
+pub mod infra;
+ 
+ // Domain data shapes shared across layers
+ pub mod domain;
+ 
+ // Non-invasive architecture scaffolding to guide future refactors.
+ pub mod architecture;

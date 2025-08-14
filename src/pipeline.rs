@@ -1,4 +1,4 @@
-use crate::carpenter::RawData;
+use crate::domain::RawData;
 use crate::error::Result;
 use crate::storage::Storage;
 use crate::types::{EventApi, EventArgs, RawDataInfo};
@@ -8,7 +8,6 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
-use metrics::{counter, histogram};
 
 /// Processed event ready for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,54 +32,15 @@ pub struct PipelineResult {
 pub struct Pipeline;
 
 impl Pipeline {
-    async fn push_pushgateway_metrics(api: &str, processed: usize, skipped: usize, errors: usize, duration_secs: f64) {
-        let base = match std::env::var("SMS_PUSHGATEWAY_URL") {
-            Ok(v) if !v.trim().is_empty() => v,
-            _ => return,
-        };
-        let instance = api; // use api name as instance label for clarity
-        let push_url = format!("{}/metrics/job/{}/instance/{}", base.trim_end_matches('/'), "sms_scraper", instance);
-        
-        // Get current timestamp for freshness tracking
-        let timestamp_secs = chrono::Utc::now().timestamp() as f64;
-        
-        let body = format!(
-            "# TYPE sms_ingest_runs_total counter\n\
-             sms_ingest_runs_total 1\n\
-             # TYPE sms_events_processed_total counter\n\
-             sms_events_processed_total {}\n\
-             # TYPE sms_events_skipped_total counter\n\
-             sms_events_skipped_total {}\n\
-             # TYPE sms_pipeline_errors_total counter\n\
-             sms_pipeline_errors_total {}\n\
-             # TYPE sms_pipeline_duration_seconds gauge\n\
-             sms_pipeline_duration_seconds {}\n\
-             # TYPE sms_pipeline_last_run_timestamp_seconds gauge\n\
-             sms_pipeline_last_run_timestamp_seconds {}\n",
-            processed, skipped, errors, duration_secs, timestamp_secs
-        );
-        
-        let client = reqwest::Client::new();
-        
-        // Step 1: Push metrics to Pushgateway
-        let push_res = client
-            .post(&push_url)
-            .header("Content-Type", "text/plain; version=0.0.4")
-            .body(body)
-            .send()
-            .await;
-            
-        match push_res {
-            Ok(r) if r.status().is_success() => {
-                tracing::info!("Pushed metrics to Pushgateway for api={}", api);
-            }
-            Ok(r) => {
-                tracing::warn!("Pushgateway push responded with status {} for api={}", r.status().as_u16(), api);
-            }
-            Err(e) => {
-                tracing::warn!("Failed to push metrics to Pushgateway for api={}: {}", api, e);
-            }
-        }
+    async fn push_pushgateway_metrics(
+        _api: &str,
+        _processed: usize,
+        _skipped: usize,
+        _errors: usize,
+        _duration_secs: f64,
+    ) {
+        // Deprecated: kept for compatibility; use metrics::push_all_to_pushgateway instead
+        return;
     }
     /// Process a single raw event into a ProcessedEvent
     #[instrument(skip(api, raw_event), fields(api_name = %api.api_name()))]
@@ -121,7 +81,7 @@ impl Pipeline {
         info!("🚀 Starting pipeline with storage for {}", api_name);
         println!("🚀 Starting pipeline for {}", api_name);
         // metrics: count pipeline runs
-        counter!("sms_pipeline_runs_total", "api" => api_name.clone()).increment(1);
+        crate::metrics::SourcesMetrics::record_registry_load_success("");
         let t_pipeline = std::time::Instant::now();
 
         // Step 1: Fetch raw events
@@ -130,10 +90,11 @@ impl Pipeline {
         let t_fetch = std::time::Instant::now();
         let raw_events = api.get_event_list().await?;
         let fetch_secs = t_fetch.elapsed().as_secs_f64();
-        histogram!("sms_fetch_events_duration_seconds", "api" => api_name.clone()).record(fetch_secs);
+        crate::metrics::SourcesMetrics::record_request_duration("", fetch_secs);
         info!("✅ Fetched {} raw events", raw_events.len());
         println!("✅ Fetched {} raw events", raw_events.len());
-        histogram!("sms_raw_events_per_run", "api" => api_name.clone()).record(raw_events.len() as f64);
+        // Record payload size through Sources metrics
+        crate::metrics::SourcesMetrics::record_request_success("", 0.0, raw_events.len());
 
         // Step 2: Process events
         info!("🔧 Processing events...");
@@ -174,16 +135,18 @@ impl Pipeline {
             skipped,
             errors.len()
         );
-        // metrics: counts
-        counter!("sms_events_processed_total", "api" => api_name.clone()).increment(processed_events.len() as u64);
-        counter!("sms_events_skipped_total", "api" => api_name.clone()).increment(skipped as u64);
-        counter!("sms_event_errors_total", "api" => api_name.clone()).increment(errors.len() as u64);
+        // metrics: counts using new phase-based system
+        crate::metrics::ParserMetrics::record_batch_run_success(processed_events.len(), 0.0);
+        crate::metrics::ParserMetrics::record_envelopes_skipped(skipped);
+        if errors.len() > 0 {
+            crate::metrics::ParserMetrics::record_parse_error("", "", "processing_error");
+        }
 
         // Step 3: Save raw data to storage
         info!("💾 Saving raw data to storage...");
         for processed_event in &processed_events {
             let mut raw_data = RawData::from_processed_event(processed_event);
-            // Map API names to the format expected by carpenter
+            // Map API names to the internal storage format
             raw_data.api_name = crate::constants::api_name_to_internal(&raw_data.api_name);
             if let Err(e) = storage.create_raw_data(&mut raw_data).await {
                 warn!("Failed to save raw data to storage: {}", e);
@@ -197,10 +160,12 @@ impl Pipeline {
 
         // metrics: total pipeline duration
         let total_secs = t_pipeline.elapsed().as_secs_f64();
-        histogram!("sms_pipeline_duration_seconds", "api" => api_name.clone()).record(total_secs);
+        crate::metrics::ParserMetrics::record_batch_run_success(0, total_secs);
 
-        // Push a minimal metrics snapshot to Pushgateway if configured
-        Self::push_pushgateway_metrics(&api_name, processed_events.len(), skipped, errors.len(), total_secs).await;
+        // Ensure snapshot is non-empty at push time
+        crate::metrics::bump_run_heartbeat();
+        // Push full exporter snapshot to Pushgateway (if configured)
+        crate::metrics::push_all_to_pushgateway(&api_name).await;
 
         Ok(PipelineResult {
             api_name,

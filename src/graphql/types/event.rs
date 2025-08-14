@@ -1,15 +1,15 @@
-use crate::carpenter::Event as CarpenterEvent;
+use crate::domain::Event as DomainEvent;
 use crate::graphql::schema::GraphQLContext;
 use async_graphql::{Context, FieldResult, Object, ID};
 
 /// GraphQL representation of an Event
 #[derive(Clone)]
 pub struct Event {
-    pub inner: CarpenterEvent,
+    pub inner: DomainEvent,
 }
 
-impl From<CarpenterEvent> for Event {
-    fn from(event: CarpenterEvent) -> Self {
+impl From<DomainEvent> for Event {
+fn from(event: DomainEvent) -> Self {
         Self { inner: event }
     }
 }

@@ -1,8 +1,8 @@
+use crate::ingest_meta::IngestMeta;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::PathBuf;
-use crate::ingest_meta::IngestMeta;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ConsumerOffset {
@@ -25,20 +25,23 @@ impl IngestLogReader {
         self.root.join("ingest_log").join("ingest.ndjson")
     }
 
-    fn offsets_dir(&self) -> PathBuf { self.root.join("ingest_log").join("offsets") }
-
-    fn offset_path(&self, consumer: &str) -> PathBuf {
-        self.offsets_dir().join(format!("{}.json", consumer))
-    }
 
     fn load_offset(&self, consumer: &str) -> ConsumerOffset {
         // Read from SQLite meta
         if let Ok(meta) = IngestMeta::open_at_root(&self.root) {
             if let Ok((byte_offset, envelope_id)) = meta.get_offset(consumer) {
-                return ConsumerOffset { file: "ingest.ndjson".to_string(), byte_offset, envelope_id };
+                return ConsumerOffset {
+                    file: "ingest.ndjson".to_string(),
+                    byte_offset,
+                    envelope_id,
+                };
             }
         }
-        ConsumerOffset { file: "ingest.ndjson".to_string(), byte_offset: 0, envelope_id: None }
+        ConsumerOffset {
+            file: "ingest.ndjson".to_string(),
+            byte_offset: 0,
+            envelope_id: None,
+        }
     }
 
     fn save_offset(&self, consumer: &str, off: &ConsumerOffset) -> std::io::Result<()> {
@@ -53,19 +56,27 @@ impl IngestLogReader {
         let mut off = self.load_offset(consumer);
         let log_path = self.log_path();
         let end = fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0);
-        if off.byte_offset > end { off.byte_offset = 0; }
+        if off.byte_offset > end {
+            off.byte_offset = 0;
+        }
         let lag = end.saturating_sub(off.byte_offset);
         Ok((off, end, lag))
     }
 
-    pub fn read_next(&self, consumer: &str, max: usize) -> std::io::Result<(Vec<String>, Option<String>)> {
+    pub fn read_next(
+        &self,
+        consumer: &str,
+        max: usize,
+    ) -> std::io::Result<(Vec<String>, Option<String>)> {
         let mut off = self.load_offset(consumer);
         let path = self.log_path();
         let file = File::open(&path)?;
         let mut reader = BufReader::new(file);
         // Handle rotation: if stored offset is beyond current file end, reset to 0
         let end = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        if off.byte_offset > end { off.byte_offset = 0; }
+        if off.byte_offset > end {
+            off.byte_offset = 0;
+        }
         reader.seek(SeekFrom::Start(off.byte_offset))?;
 
         let mut lines = Vec::new();
@@ -74,10 +85,16 @@ impl IngestLogReader {
         for _ in 0..max {
             let mut buf = String::new();
             let bytes = reader.read_line(&mut buf)?;
-            if bytes == 0 { break; } // EOF
-            // Trim newline for cleaner output but we keep byte math using bytes
-            if let Some(stripped) = buf.strip_suffix('\n') { buf = stripped.to_string(); }
-            if buf.trim().is_empty() { continue; }
+            if bytes == 0 {
+                break;
+            } // EOF
+              // Trim newline for cleaner output but we keep byte math using bytes
+            if let Some(stripped) = buf.strip_suffix('\n') {
+                buf = stripped.to_string();
+            }
+            if buf.trim().is_empty() {
+                continue;
+            }
             // Capture envelope_id for ack convenience
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&buf) {
                 if let Some(id) = val.get("envelope_id").and_then(|v| v.as_str()) {
@@ -90,7 +107,11 @@ impl IngestLogReader {
         Ok((lines, last_env))
     }
 
-    pub fn ack_through(&self, consumer: &str, envelope_id: &str) -> std::io::Result<ConsumerOffset> {
+    pub fn ack_through(
+        &self,
+        consumer: &str,
+        envelope_id: &str,
+    ) -> std::io::Result<ConsumerOffset> {
         // Advance from current offset up to and including the line with envelope_id
         let mut off = self.load_offset(consumer);
         let path = self.log_path();
@@ -104,7 +125,9 @@ impl IngestLogReader {
         loop {
             buf.clear();
             let read = reader.read_line(&mut buf)?;
-            if read == 0 { break; } // EOF
+            if read == 0 {
+                break;
+            } // EOF
             cur += read as u64;
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&buf) {
                 if val.get("envelope_id").and_then(|v| v.as_str()) == Some(envelope_id) {
@@ -126,12 +149,19 @@ impl IngestLogReader {
     pub fn resolve_payload_path(&self, payload_ref: &str) -> Option<PathBuf> {
         // Expect payload_ref like "cas:sha256:<hex>"
         let prefix = "cas:sha256:";
-        if !payload_ref.starts_with(prefix) { return None; }
+        if !payload_ref.starts_with(prefix) {
+            return None;
+        }
         let hex = &payload_ref[prefix.len()..];
-        if hex.len() < 4 { return None; }
-        let p = self.root
-            .join("cas").join("sha256")
-            .join(&hex[0..2]).join(&hex[2..4])
+        if hex.len() < 4 {
+            return None;
+        }
+        let p = self
+            .root
+            .join("cas")
+            .join("sha256")
+            .join(&hex[0..2])
+            .join(&hex[2..4])
             .join(hex);
         Some(p)
     }
@@ -139,7 +169,9 @@ impl IngestLogReader {
     pub fn find_envelope_by_id(&self, envelope_id: &str) -> std::io::Result<Option<String>> {
         // Linear scan of active log file (sufficient for now)
         let path = self.log_path();
-        if !path.exists() { return Ok(None); }
+        if !path.exists() {
+            return Ok(None);
+        }
         let file = File::open(&path)?;
         let reader = BufReader::new(file);
         for line in reader.lines() {

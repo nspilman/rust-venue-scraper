@@ -125,7 +125,9 @@ pub mod application {
 
 pub mod infrastructure {
     // Adapters that will implement application ports using concrete tech (reqwest, fs, db, etc.)
-    use super::application::{HttpClientPort, HttpGetResponse, MetricsPort};
+    use super::application::{ClockPort, ContentMeta, HttpClientPort, HttpGetResponse, MetricsPort, StoragePort};
+    use serde_json::json;
+    use std::path::{Path, PathBuf};
 
     pub struct ReqwestHttpClient;
 
@@ -168,6 +170,115 @@ pub mod infrastructure {
         fn observe(&self, name: &'static str, value: f64) {
             let h = ::metrics::histogram!(name);
             h.record(value);
+        }
+    }
+
+    /// Simple clock adapter using std::time::SystemTime::now
+    pub struct UtcClock;
+    impl ClockPort for UtcClock {
+        fn now_utc(&self) -> std::time::SystemTime {
+            std::time::SystemTime::now()
+        }
+    }
+
+    /// Storage adapter that persists to local CAS and appends to ingest log (NDJSON)
+    pub struct LocalCasAndLog {
+        root: PathBuf,
+    }
+
+    impl LocalCasAndLog {
+        pub fn new<P: AsRef<Path>>(root: P) -> Self {
+            Self { root: root.as_ref().to_path_buf() }
+        }
+
+        fn cas_path_for_key(&self, key: &str) -> PathBuf {
+            // key is sha256 hex
+            let (a, b) = (&key[0..2], &key[2..4]);
+            self.root
+                .join("cas")
+                .join("sha256")
+                .join(a)
+                .join(b)
+                .join(key)
+        }
+
+        fn ingest_log_path(&self) -> PathBuf {
+            self.root.join("ingest_log").join("ingest.ndjson")
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl StoragePort for LocalCasAndLog {
+        async fn save_raw(&self, key: &str, bytes: Vec<u8>) -> Result<(), String> {
+            let path = self.cas_path_for_key(key);
+            if let Some(parent) = path.parent() {
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| format!("save_raw:create_dir_all parent={} err={}", parent.display(), e))?;
+            }
+            // Write atomically by writing to tmp then rename
+            let tmp = path.with_extension("tmp");
+            if tokio::fs::try_exists(&path)
+                .await
+                .map_err(|e| format!("save_raw:try_exists path={} err={}", path.display(), e))?
+            {
+                return Ok(()); // already present
+            }
+            tokio::fs::write(&tmp, &bytes)
+                .await
+                .map_err(|e| format!("save_raw:write tmp={} err={}", tmp.display(), e))?;
+            tokio::fs::rename(&tmp, &path)
+                .await
+                .map_err(|e| format!("save_raw:rename tmp={} -> path={} err={}", tmp.display(), path.display(), e))?;
+            Ok(())
+        }
+
+        async fn load_raw(&self, key: &str) -> Result<Option<Vec<u8>>, String> {
+            let path = self.cas_path_for_key(key);
+            if !tokio::fs::try_exists(&path)
+                .await
+                .map_err(|e| format!("load_raw:try_exists path={} err={}", path.display(), e))?
+            {
+                return Ok(None);
+            }
+            let b = tokio::fs::read(&path)
+                .await
+                .map_err(|e| format!("load_raw:read path={} err={}", path.display(), e))?;
+            Ok(Some(b))
+        }
+
+        async fn record_ingest(&self, meta: &ContentMeta, payload_ref: &str) -> Result<String, String> {
+            let logp = self.ingest_log_path();
+            if let Some(parent) = logp.parent() {
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| format!("record_ingest:create_dir_all parent={} err={}", parent.display(), e))?;
+            }
+            let env_id = uuid::Uuid::new_v4().to_string();
+            let obj = json!({
+                "envelope_id": env_id,
+                "payload_ref": payload_ref,
+                "meta": {
+                    "url": meta.url,
+                    "method": meta.method,
+                    "content_type": meta.content_type,
+                    "content_length": meta.content_length,
+                    "checksum": { "sha256": meta.sha256_hex },
+                }
+            });
+            let line = serde_json::to_string(&obj)
+                .map_err(|e| format!("record_ingest:serde_json_to_string err={}", e))? + "\n";
+            use tokio::io::AsyncWriteExt;
+            let mut f = tokio::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&logp)
+                .await
+                .map_err(|e| format!("record_ingest:open path={} err={}", logp.display(), e))?;
+            f.write_all(line.as_bytes())
+                .await
+                .map_err(|e| format!("record_ingest:write_all path={} err={}", logp.display(), e))?;
+            Ok(obj["envelope_id"].as_str().unwrap_or("").to_string())
         }
     }
 }

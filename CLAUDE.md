@@ -4,7 +4,7 @@
 This is a Rust-based event data scraper for the Seattle Music Scene (SMS) project, migrating from a Python Django implementation. The system follows an ETL (Extract, Transform, Load) architecture with two main components:
 
 1. **Ingester**: Fetches raw, unprocessed data from external sources
-2. **Carpenter**: Cleans, transforms, and loads raw data into structured database models
+2. Processing: Cleans, transforms, and loads raw data into structured database models
 
 ## Current Architecture
 
@@ -12,7 +12,7 @@ This is a Rust-based event data scraper for the Seattle Music Scene (SMS) projec
 - **Pipeline**: Orchestrates the data flow from raw ingestion to processed output
 - **EventApi Trait**: Common interface for all data sources (APIs and web crawlers)
 - **Storage**: Abstraction layer for data persistence (currently in-memory, will connect to PostgreSQL)
-- **Carpenter**: Data processing and cleaning component
+- Processing: Data processing and cleaning component
 - **Types**: Core data structures and models
 
 ### Implemented Data Sources
@@ -35,8 +35,8 @@ cargo build
 
 # Run with different modes
 cargo run -- ingester --apis blue_moon,sea_monster
-cargo run -- carpenter --apis blue_moon --process-all
-cargo run -- run --apis blue_moon
+# (former carpenter/run commands have been removed)
+# Use ingester and server commands as needed
 
 # Check for errors and warnings
 cargo check
@@ -74,11 +74,11 @@ cargo clippy -- -D warnings
 - Logging and error handling infrastructure
 - CLI interface with subcommands
 - Raw data storage abstraction
-- Carpenter framework for data processing
+- Processing framework for data transformation
 
 ### 🚧 In Progress
 - Storage layer (currently in-memory, needs PostgreSQL integration)
-- Carpenter data processing logic (basic framework exists)
+- Processing logic (basic framework exists)
 
 ### 📋 Planned
 - Database schema and SQLx integration
@@ -96,7 +96,7 @@ src/
 │   ├── mod.rs
 │   ├── blue_moon.rs     # Blue Moon Tavern crawler
 │   └── sea_monster.rs   # Sea Monster Lounge crawler
-├── carpenter.rs         # Data processing and cleaning
+├── domain/              # Domain entities (venue, artist, event, etc.)
 ├── config.rs            # Configuration management
 ├── error.rs             # Error types and handling
 ├── logging.rs           # Logging setup

@@ -5,7 +5,7 @@ pub const BLUE_MOON_API: &str = "blue_moon";
 pub const SEA_MONSTER_API: &str = "sea_monster";
 pub const DARRELLS_TAVERN_API: &str = "darrells_tavern";
 
-// Internal API names (used by carpenter implementations)
+// Internal API names (used by storage implementations)
 pub const BLUE_MOON_INTERNAL: &str = "crawler_blue_moon";
 pub const SEA_MONSTER_INTERNAL: &str = "crawler_sea_monster_lounge";
 pub const DARRELLS_TAVERN_INTERNAL: &str = "crawler_darrells_tavern";
@@ -18,7 +18,7 @@ pub const DARRELLS_TAVERN_VENUE_NAME: &str = "Darrell's Tavern";
 // Note: The sea monster crawler returns "crawler_sea_monster" but we map it to
 // "crawler_sea_monster_lounge" for storage consistency
 
-/// Convert user-friendly API name to internal name used by carpenter/storage
+/// Convert user-friendly API name to internal name used by storage/persistence layers
 pub fn api_name_to_internal(api_name: &str) -> String {
     match api_name {
         BLUE_MOON_API => BLUE_MOON_INTERNAL.to_string(),

@@ -20,6 +20,7 @@ pub enum ScraperError {
     #[error("Environment variable error: {0}")]
     Env(#[from] std::env::VarError),
 
+    #[cfg(feature = "db")]
     #[error("Database error: {message}")]
     Database { message: String },
 }

@@ -46,13 +46,13 @@ CREATE TABLE edges (
 - **Artists** → Stored as `artist` nodes with bio and image data
 - **Events** → Stored as `event` nodes with timing and description
 - **Raw Data** → Stored as `raw_data` nodes with processing status
-- **Carpenter Runs** → Stored as `carpenter_run` nodes for audit tracking
-- **Carpenter Records** → Stored as `carpenter_record` nodes for change tracking
+- Process Runs → Stored as `process_run` nodes for audit tracking
+- Process Records → Stored as `process_record` nodes for change tracking
 
 ### 5. Relationships via Edges
 - **venue** `hosts` **event** - Events happening at venues
 - **artist** `performs_at` **event** - Artists performing at events  
-- **carpenter_run** `has_record` **carpenter_record** - Audit trail of changes
+- **process_run** `has_record` **process_record** - Audit trail of changes
 
 ### 6. CLI Integration
 Enhanced command-line interface with database support:
@@ -62,8 +62,6 @@ cargo run -- ingester --apis blue_moon
 
 # Database mode
 cargo run -- ingester --apis blue_moon --use-database
-cargo run -- carpenter --apis blue_moon --use-database  
-cargo run -- run --apis blue_moon --use-database
 ```
 
 ### 7. Test Suite
@@ -80,7 +78,7 @@ cargo run -- run --apis blue_moon --use-database
 - ✅ Edge creation for relationship tracking
 - ✅ Complex queries for entity relationships
 - ✅ Raw data processing flag management
-- ✅ Carpenter run and record tracking
+- ✅ Process run and record tracking
 
 ### Serialization Strategy
 - **JSON Serialization**: All entities serialized to JSON for flexible schema evolution
@@ -98,7 +96,7 @@ cargo run -- run --apis blue_moon --use-database
 
 ### 1. Data Persistence
 - **Persistent Storage**: Events, venues, and artists now persist between runs
-- **Audit Trail**: Complete history of all carpenter operations and changes
+- **Audit Trail**: Complete history of all processing operations and changes
 - **Data Integrity**: Referential integrity maintained through foreign key constraints
 - **Backup and Recovery**: Database-native backup and recovery capabilities
 

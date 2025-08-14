@@ -1,0 +1,21 @@
+🚀 Starting GraphQL API server on port 8081...
+[2m2025-08-14T05:13:17.632892Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m42:[0m Prometheus HTTP exporter requested at http://0.0.0.0:9898/metrics
+[2m2025-08-14T05:13:17.834242Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m51:[0m Prometheus recorder installed (handle available for in-process render)
+[2m2025-08-14T05:13:17.834828Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 7 metrics for phase 'sources'
+[2m2025-08-14T05:13:17.835250Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 10 metrics for phase 'gateway'
+[2m2025-08-14T05:13:17.836047Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 11 metrics for phase 'ingest_log'
+[2m2025-08-14T05:13:17.836270Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 15 metrics for phase 'parser'
+[2m2025-08-14T05:13:17.836338Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m23:[0m Registered 43 total metrics across all phases
+[2m2025-08-14T05:13:17.836381Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m55:[0m All pipeline metrics registered successfully
+[2m2025-08-14T05:13:17.836403Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m199:[0m Using in-memory storage (data will not persist)
+📡 Server endpoints:
+   GraphQL API: http://localhost:8081/graphql
+   Metrics: http://0.0.0.0:9898/metrics
+   GraphiQL UI: http://localhost:8081/graphiql
+   Playground UI: http://localhost:8081/playground
+   Health check: http://localhost:8081/health
+
+🧠 Using in-memory storage (data will not persist)
+
+🚀 HTTP server running on http://localhost:8081
+💚 Health check: http://localhost:8081/health

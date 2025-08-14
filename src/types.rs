@@ -1,4 +1,3 @@
-use crate::constants::{BLUE_MOON_INTERNAL, DARRELLS_TAVERN_INTERNAL, SEA_MONSTER_INTERNAL};
 use crate::error::Result;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
@@ -57,21 +56,4 @@ pub trait EventApi: Send + Sync {
     }
 }
 
-/// Represents the priority order of APIs for processing
-pub const API_PRIORITY_ORDER: &[&str] = &[
-    "manual",
-    "dice",
-    "axs",
-    "tixr",
-    "venuepilot",
-    "songkick",
-    "bandsintown",
-    BLUE_MOON_INTERNAL,
-    DARRELLS_TAVERN_INTERNAL,
-    "crawler_little_red_hen",
-    SEA_MONSTER_INTERNAL,
-    "crawler_skylark",
-    "crawler_the_royal_room",
-    "eventbrite",
-    "ticketmaster",
-];
+// Removed legacy API priority list; registry and feature flags drive execution now.

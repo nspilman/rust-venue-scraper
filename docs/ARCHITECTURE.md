@@ -15,12 +15,12 @@ Layers
 
 2) Application (src/application)
    - Use-cases orchestrating domain operations.
-   - Defines traits (ports) for things the use-cases need: StoragePort, HttpClientPort, ClockPort, MetricsPort, IngestLogPort, etc.
+   - Defines traits (ports) for things the use-cases need: RegistryPort, GatewayPort (or Policy/Dedupe), RawStorePort, IngestLogPort, CatalogPort, HttpClientPort, ClockPort, MetricsPort.
    - Depends only on Domain and standard library. No concrete crates for IO here.
    - Test strategy: use mocks/fakes for ports.
 
 3) Infrastructure (src/infrastructure)
-   - Adapters that implement application ports using concrete tech: reqwest, filesystem, databases, metrics, tracing, schedulers.
+   - Adapters that implement application ports using concrete tech: reqwest, filesystem (CAS), append-only ingest log, databases/graph, metrics, tracing, schedulers.
    - May depend on external crates but must not leak those types into Domain or Application.
    - Test strategy: integration tests; allow using real network/filesystem in tests.
 
@@ -33,6 +33,16 @@ Dependency flow
 Interface -> Application -> Domain
 Infrastructure -> Application (implements its traits)
 
+Staged pipeline (Platonic Ideal alignment)
+- Registry: enumerate sources and parse plans via RegistryPort
+- Gateway accept: policy, cadence/fairness, dedupe (GatewayPort); persist raw bytes (RawStorePort) and append an envelope to the ingest log (IngestLogPort)
+- Parse: decode envelopes into neutral records using parse plans
+- Normalize: map neutral records to canonical shapes
+- Quality Gate: accept/quarantine with deterministic rules
+- Enrich: add spatial bins/tags
+- Conflate: link mentions to durable entities
+- Catalog: write nodes/edges with provenance via CatalogPort
+
 Migration plan
 - Introduce the directories and traits (this change) without moving code.
 - Extract pure types and logic from existing modules into Domain as we touch them.
@@ -41,6 +51,9 @@ Migration plan
 - Keep binaries (main.rs and any bins) limited to composition and argument parsing.
 
 Conventions
+- Raw bytes are immutable and content-addressed (CAS). Once accepted, payloads never change.
+- The ingest log is append-only. Entries are not updated; replays read by offset or by envelope_id.
+- Downstream stores prefer append-only or close-and-append to preserve history and provenance.
 - Errors: Domain and Application use thiserror-based types; Infrastructure may use anyhow internally and map at the boundary.
 - Config: define a Config type at composition time; pass it to constructors when wiring.
 - Testing:

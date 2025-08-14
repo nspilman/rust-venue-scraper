@@ -30,10 +30,8 @@ fn invalid_checksum_format_is_rejected() {
     let schema_static: &'static serde_json::Value = Box::leak(Box::new(schema_json));
     let compiled = JSONSchema::options().compile(schema_static).unwrap();
 
-    let mut invalid: serde_json::Value = serde_json::from_str(include_str!(
-        "resources/envelope_submission.json"
-    ))
-    .unwrap();
+    let mut invalid: serde_json::Value =
+        serde_json::from_str(include_str!("resources/envelope_submission.json")).unwrap();
     // Break checksum
     invalid["payload_meta"]["checksum"]["sha256"] = json!("NOTAHEX");
 
@@ -48,12 +46,9 @@ fn adapters_cannot_set_payload_ref() {
     let compiled = JSONSchema::options().compile(schema_static).unwrap();
 
     // Start from submission and inject payload_ref (should still be allowed by schema, but policy will reject).
-    let mut with_ref: serde_json::Value = serde_json::from_str(include_str!(
-        "resources/envelope_submission.json"
-    ))
-    .unwrap();
+    let mut with_ref: serde_json::Value =
+        serde_json::from_str(include_str!("resources/envelope_submission.json")).unwrap();
     with_ref["payload_ref"] = json!("sha256://deadbeef");
     // Schema permits payload_ref structurally
     assert!(compiled.is_valid(&with_ref));
 }
-

@@ -9,6 +9,7 @@ A modular, asynchronous Rust-based event data scraper with database persistence,
 - **🔄 ETL Pipeline**: Complete Extract, Transform, Load architecture
 - **🔨 Smart Processing**: Venue/artist matching, deduplication, and relationship tracking
 - **🚀 Async Architecture**: High-performance concurrent processing
+- **📊 Comprehensive Metrics**: Phase-based Prometheus metrics for complete pipeline observability
 
 ## Architecture
 
@@ -18,7 +19,7 @@ The scraper exhibits a modular and extensible architecture with clean separation
 
 - **EventApi Trait**: Central abstraction that all crawler modules implement, defining the contract for API-specific logic
 - **Pipeline Module**: Handles raw event ingestion, processing each raw event into structured `ProcessedEvent` data
-- **Carpenter Module**: Processes stored raw data, creating/updating domain objects (venues, artists, events) with change tracking
+- Processing: Handles stored raw data creating/updating domain objects (venues, artists, events) with change tracking
 - **Storage Abstraction**: `Storage` trait abstracting all persistence operations with in-memory implementation for development
 
 ### Features
@@ -60,18 +61,39 @@ cargo run -- ingester --apis blue_moon,sea_monster
 # Run ingester with database persistence
 cargo run -- ingester --apis blue_moon --use-database
 
-# Run carpenter to process raw data  
-cargo run -- carpenter --apis blue_moon --use-database
-
-# Run full pipeline (ingester + carpenter)
-cargo run -- run --apis blue_moon,sea_monster --use-database
 
 # Test database connection
 cargo run --bin test_db
 
 # Run integration tests
 cargo run --bin test_integration
+
+# Run with metrics (includes server with /metrics endpoint)
+cargo run -- server --port 8080
 ```
+
+### 📊 Metrics & Observability
+
+The scraper includes comprehensive Prometheus-compatible metrics:
+
+```bash
+# Run complete pipeline demonstration with metrics
+./demo-local.sh
+
+# View metrics in real-time
+curl http://localhost:9898/metrics
+
+# Start with Docker Compose (includes Prometheus + Grafana)
+docker-compose up -d
+```
+
+Metrics cover all pipeline phases:
+- **Sources**: Request success/failure, durations, payload sizes
+- **Gateway**: Envelope processing, deduplication rates, CAS operations  
+- **Parser**: Parsing performance, record production, error rates
+- **Ingest Log**: Write operations, consumer lag, file rotations
+
+See [METRICS.md](METRICS.md) for complete documentation.
 
 ## Configuration
 
@@ -94,11 +116,15 @@ Configuration is managed via `config.toml` with support for:
 
 **Future Enhancements:**
 - ✅ ~~Persistent storage backend~~ → **Turso/libSQL implemented**
-- Enhanced concurrent processing in carpenter
+- Enhanced concurrent processing in processing stage
 - External API integrations (Ticketmaster, Eventbrite, etc.)
 - Advanced artist parsing with NLP
 - GraphQL API layer for data access
 - Web dashboard for monitoring and management
+
+## Archive
+
+The historical “carpenter” implementation has been preserved for reference in archive/carpenter.rs. The live codebase no longer uses or references it.
 
 ## Development
 

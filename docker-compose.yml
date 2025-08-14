@@ -4,18 +4,39 @@ services:
     image: sms-scraper:latest
     container_name: sms_scraper
     ports:
-      - "8080:8080"
-      - "9898:9898"
+      - "8080:8080"   # GraphQL API
+      - "9464:9464"   # Prometheus metrics endpoint
     environment:
-      - SMS_METRICS_PORT=9898
+      - PROMETHEUS_ADDR=0.0.0.0:9464
       - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
+      - RUST_LOG=info
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 10s
+    volumes:
+      - ./data:/app/data    # Persist scraper data
     restart: unless-stopped
+    command: ["/usr/local/bin/sms_scraper", "server", "--port", "8080"]
+
+  # One-off ingester job, run with: docker compose run --rm ingester
+  ingester:
+    image: sms-scraper:latest
+    profiles: ["disabled"]
+    environment:
+      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
+      - PROMETHEUS_ADDR=0.0.0.0:9898  # Metrics will be scraped from this port
+      - RUST_LOG=info
+    ports:
+      - "9898:9898"  # Expose metrics port for scraping
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - pushgateway
+    entrypoint: ["/usr/local/bin/sms_scraper"]
+    command: ["ingester", "--apis", "blue_moon", "--bypass-cadence"]
 
   pushgateway:
     image: prom/pushgateway:latest
@@ -44,7 +65,6 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
-    profiles: ["observability"]
     ports:
       - "3000:3000"
     environment:

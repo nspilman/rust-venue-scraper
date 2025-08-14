@@ -4,7 +4,7 @@
 
 ### ✅ Core Infrastructure Complete
 - **Project Setup**: Cargo.toml with all necessary dependencies
-- **CLI Interface**: Full command-line interface with ingester/carpenter/run modes
+- **CLI Interface**: Command-line interface with ingester, parser, and server modes
 - **Logging System**: Structured logging with tracing, file outputs, and proper levels
 - **Error Handling**: Custom error types with proper error propagation
 - **Configuration**: TOML-based config system with environment variable support
@@ -28,7 +28,7 @@
 ### ✅ Recently Completed
 - **Database Integration**: Full Turso/libSQL integration with nodes and edges schema
 - **Storage Layer**: Both in-memory and database storage implementations complete
-- **Carpenter System**: Complete data processing logic with database persistence
+- Processing system: Complete data processing logic with database persistence
 - **Graph Database Schema**: Nodes and edges implementation with relationship tracking
 - **CLI Database Support**: Command-line flags for choosing storage backend
 
@@ -43,7 +43,7 @@
    - High data volume and reliability
    - Reference implementation for other APIs
 
-2. **Enhanced Carpenter Features**
+2. Enhanced processing features
    - Advanced artist extraction from event titles
    - Better venue matching logic with fuzzy search
    - Event deduplication across multiple sources
@@ -98,7 +98,7 @@
 ## Migration Progress vs Original Plan
 
 **✅ Completed from Migration Plan:**
-- Dual-component pipeline (Ingester/Carpenter) 
+- Dual-component pipeline (Ingester/Processing) 
 - Strategy pattern via EventApi trait
 - ETL architecture
 - Asynchronous HTTP with tokio/reqwest
@@ -107,7 +107,7 @@
 - Basic configuration management
 - **Database compatibility (Turso/libSQL with graph schema)**
 - **Full data persistence with nodes and edges**
-- **Carpenter run tracking and audit logging**
+- Processing run tracking and audit logging
 
 **🚧 In Progress:**
 - Idempotency (framework ready, enhanced logic needed)

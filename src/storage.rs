@@ -1,4 +1,4 @@
-use crate::carpenter::*;
+use crate::domain::*;
 #[cfg(feature = "db")]
 use crate::db::DatabaseManager;
 use crate::error::{Result, ScraperError};
@@ -6,10 +6,10 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, info};
+use tracing::debug;
 use uuid::Uuid;
 
-/// Storage trait for persisting carpenter data
+/// Storage trait for persisting domain data (venues, artists, events, raw data, and process runs/records)
 #[async_trait]
 pub trait Storage: Send + Sync {
     // Venue operations
@@ -38,12 +38,12 @@ pub trait Storage: Send + Sync {
     ) -> Result<Vec<RawData>>;
     async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()>;
 
-    // Carpenter run operations
-    async fn create_carpenter_run(&self, run: &mut CarpenterRun) -> Result<()>;
-    async fn update_carpenter_run(&self, run: &CarpenterRun) -> Result<()>;
+    // Processing run operations
+    async fn create_process_run(&self, run: &mut ProcessRun) -> Result<()>;
+    async fn update_process_run(&self, run: &ProcessRun) -> Result<()>;
 
-    // Carpenter record operations
-    async fn create_carpenter_record(&self, record: &mut CarpenterRecord) -> Result<()>;
+    // Processing record operations
+    async fn create_process_record(&self, record: &mut ProcessRecord) -> Result<()>;
 
     // Additional query methods for GraphQL
     async fn get_venue_by_id(&self, venue_id: Uuid) -> Result<Option<Venue>>;
@@ -80,8 +80,8 @@ pub struct InMemoryStorage {
     artists: Arc<Mutex<HashMap<Uuid, Artist>>>,
     events: Arc<Mutex<HashMap<Uuid, Event>>>,
     raw_data: Arc<Mutex<HashMap<Uuid, RawData>>>,
-    carpenter_runs: Arc<Mutex<HashMap<Uuid, CarpenterRun>>>,
-    carpenter_records: Arc<Mutex<HashMap<Uuid, CarpenterRecord>>>,
+    process_runs: Arc<Mutex<HashMap<Uuid, ProcessRun>>> ,
+    process_records: Arc<Mutex<HashMap<Uuid, ProcessRecord>>> ,
 }
 
 impl Default for InMemoryStorage {
@@ -97,8 +97,8 @@ impl InMemoryStorage {
             artists: Arc::new(Mutex::new(HashMap::new())),
             events: Arc::new(Mutex::new(HashMap::new())),
             raw_data: Arc::new(Mutex::new(HashMap::new())),
-            carpenter_runs: Arc::new(Mutex::new(HashMap::new())),
-            carpenter_records: Arc::new(Mutex::new(HashMap::new())),
+            process_runs: Arc::new(Mutex::new(HashMap::new())),
+            process_records: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -227,37 +227,37 @@ impl Storage for InMemoryStorage {
         Ok(())
     }
 
-    async fn create_carpenter_run(&self, run: &mut CarpenterRun) -> Result<()> {
+    async fn create_process_run(&self, run: &mut ProcessRun) -> Result<()> {
         let id = Uuid::new_v4();
         run.id = Some(id);
 
-        let mut runs = self.carpenter_runs.lock().unwrap();
+        let mut runs = self.process_runs.lock().unwrap();
         runs.insert(id, run.clone());
 
-        debug!("Created carpenter run: {} with id {}", run.name, id);
+        debug!("Created process run: {} with id {}", run.name, id);
         Ok(())
     }
 
-    async fn update_carpenter_run(&self, run: &CarpenterRun) -> Result<()> {
+    async fn update_process_run(&self, run: &ProcessRun) -> Result<()> {
         let run_id = run.id.ok_or_else(|| ScraperError::Api {
-            message: "Cannot update carpenter run without ID".to_string(),
+            message: "Cannot update process run without ID".to_string(),
         })?;
 
-        let mut runs = self.carpenter_runs.lock().unwrap();
+        let mut runs = self.process_runs.lock().unwrap();
         runs.insert(run_id, run.clone());
 
-        debug!("Updated carpenter run: {} with id {}", run.name, run_id);
+        debug!("Updated process run: {} with id {}", run.name, run_id);
         Ok(())
     }
 
-    async fn create_carpenter_record(&self, record: &mut CarpenterRecord) -> Result<()> {
+    async fn create_process_record(&self, record: &mut ProcessRecord) -> Result<()> {
         let id = Uuid::new_v4();
         record.id = Some(id);
 
-        let mut records = self.carpenter_records.lock().unwrap();
+        let mut records = self.process_records.lock().unwrap();
         records.insert(id, record.clone());
 
-        debug!("Created carpenter record with id {}", id);
+        debug!("Created process record with id {}", id);
         Ok(())
     }
 
@@ -475,17 +475,17 @@ impl DatabaseStorage {
         Ok(raw_data)
     }
 
-    /// Convert carpenter run to node data
-    fn carpenter_run_to_node_data(run: &CarpenterRun) -> Result<String> {
+/// Convert process run to node data
+    fn process_run_to_node_data(run: &ProcessRun) -> Result<String> {
         serde_json::to_string(run).map_err(|e| ScraperError::Database {
-            message: format!("Failed to serialize carpenter run: {e}"),
+            message: format!("Failed to serialize process run: {e}"),
         })
     }
 
-    /// Convert carpenter record to node data  
-    fn carpenter_record_to_node_data(record: &CarpenterRecord) -> Result<String> {
+    /// Convert process record to node data  
+    fn process_record_to_node_data(record: &ProcessRecord) -> Result<String> {
         serde_json::to_string(record).map_err(|e| ScraperError::Database {
-            message: format!("Failed to serialize carpenter record: {e}"),
+            message: format!("Failed to serialize process record: {e}"),
         })
     }
 }
@@ -736,70 +736,70 @@ impl Storage for DatabaseStorage {
         Ok(())
     }
 
-    async fn create_carpenter_run(&self, run: &mut CarpenterRun) -> Result<()> {
+    async fn create_process_run(&self, run: &mut ProcessRun) -> Result<()> {
         let id = Uuid::new_v4();
         run.id = Some(id);
 
-        let node_data = Self::carpenter_run_to_node_data(run)?;
+        let node_data = Self::process_run_to_node_data(run)?;
 
         self.db
-            .create_node(&id.to_string(), "carpenter_run", &node_data)
+            .create_node(&id.to_string(), "process_run", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create carpenter run node: {e}"),
+                message: format!("Failed to create process run node: {e}"),
             })?;
 
-        debug!("Created carpenter run: {} with id {}", run.name, id);
+        debug!("Created process run: {} with id {}", run.name, id);
         Ok(())
     }
 
-    async fn update_carpenter_run(&self, run: &CarpenterRun) -> Result<()> {
+    async fn update_process_run(&self, run: &ProcessRun) -> Result<()> {
         let run_id = run.id.ok_or_else(|| ScraperError::Api {
-            message: "Cannot update carpenter run without ID".to_string(),
+            message: "Cannot update process run without ID".to_string(),
         })?;
 
-        let node_data = Self::carpenter_run_to_node_data(run)?;
+        let node_data = Self::process_run_to_node_data(run)?;
 
+        // Use upsert operation to update the node with new data
         self.db
-            .create_node(&run_id.to_string(), "carpenter_run", &node_data)
+            .create_node(&run_id.to_string(), "process_run", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to update carpenter run node: {e}"),
+                message: format!("Failed to update process run node: {e}"),
             })?;
 
-        debug!("Updated carpenter run: {} with id {}", run.name, run_id);
+        debug!("Updated process run: {} with id {}", run.name, run_id);
         Ok(())
     }
-
-    async fn create_carpenter_record(&self, record: &mut CarpenterRecord) -> Result<()> {
+    async fn create_process_record(&self, record: &mut ProcessRecord) -> Result<()> {
         let id = Uuid::new_v4();
         record.id = Some(id);
 
-        let node_data = Self::carpenter_record_to_node_data(record)?;
+        let node_data = Self::process_record_to_node_data(record)?;
 
         self.db
-            .create_node(&id.to_string(), "carpenter_record", &node_data)
+            .create_node(&id.to_string(), "process_record", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create carpenter record node: {e}"),
+                message: format!("Failed to create process record node: {e}"),
             })?;
 
-        // Create edge linking carpenter record to carpenter run
+        // Create edge linking process record to process run
         let edge_id = Uuid::new_v4();
         self.db
             .create_edge(
                 &edge_id.to_string(),
-                &record.carpenter_run_id.to_string(),
+                &record.process_run_id.to_string(),
                 &id.to_string(),
                 "has_record",
                 None,
             )
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create carpenter run-record edge: {e}"),
+                message: format!("Failed to create process run-record edge: {e}"),
             })?;
 
-        debug!("Created carpenter record with id {}", id);
+        debug!("Created process record with id {}", id);
         Ok(())
     }
 

@@ -9,9 +9,11 @@ pub struct GraphQLContext {
 }
 
 /// The complete GraphQL schema
+#[allow(dead_code)]
 pub type GraphQLSchema = Schema<Query, EmptyMutation, EmptySubscription>;
 
 /// Create a new GraphQL schema with the given storage
+#[allow(dead_code)]
 pub fn create_schema(storage: Arc<dyn Storage>) -> GraphQLSchema {
     Schema::build(Query, EmptyMutation, EmptySubscription)
         .data(GraphQLContext { storage })

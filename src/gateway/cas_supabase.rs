@@ -27,11 +27,22 @@ pub fn write_cas_supabase(bytes: &[u8]) -> anyhow::Result<String> {
     let path = if prefix.is_empty() {
         format!("sha256/{}/{}/{}", &hex[0..2], &hex[2..4], &hex)
     } else {
-        format!("{}/sha256/{}/{}/{}", prefix.trim_end_matches('/'), &hex[0..2], &hex[2..4], &hex)
+        format!(
+            "{}/sha256/{}/{}/{}",
+            prefix.trim_end_matches('/'),
+            &hex[0..2],
+            &hex[2..4],
+            &hex
+        )
     };
 
     // Upload with upsert=true (idempotent for same content)
-    let endpoint = format!("{}/storage/v1/object/{}/{}", url.trim_end_matches('/'), bucket, path);
+    let endpoint = format!(
+        "{}/storage/v1/object/{}/{}",
+        url.trim_end_matches('/'),
+        bucket,
+        path
+    );
 
     // Execute the HTTP call using the async client within a safe blocking section of the Tokio runtime
     let result = tokio::task::block_in_place(|| {
@@ -55,7 +66,11 @@ pub fn write_cas_supabase(bytes: &[u8]) -> anyhow::Result<String> {
 
     let (status, body) = result;
     if !status.is_success() {
-        return Err(anyhow::anyhow!("Supabase upload failed: {} - {}", status, body));
+        return Err(anyhow::anyhow!(
+            "Supabase upload failed: {} - {}",
+            status,
+            body
+        ));
     }
 
     Ok(format!("cas:sha256:{}", hex))

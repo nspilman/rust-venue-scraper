@@ -44,18 +44,22 @@ impl RateLimiter {
         // Concurrency first
         let _permit = if let Some(sem) = &self.inner.sem {
             Some(sem.acquire().await.expect("semaphore closed"))
-        } else { None };
+        } else {
+            None
+        };
 
         // Requests per minute bucket
         if let Some(rpm) = self.inner.limits.requests_per_min {
             if rpm > 0 {
-                self.consume_tokens(&self.inner.rpm_tokens, rpm as f64, 60.0, 1.0).await;
+                self.consume_tokens(&self.inner.rpm_tokens, rpm as f64, 60.0, 1.0)
+                    .await;
             }
         }
         // Bytes per minute bucket
         if let Some(bpm) = self.inner.limits.bytes_per_min {
             if bpm > 0 {
-                self.consume_tokens(&self.inner.bpm_tokens, bpm as f64, 60.0, bytes as f64).await;
+                self.consume_tokens(&self.inner.bpm_tokens, bpm as f64, 60.0, bytes as f64)
+                    .await;
             }
         }
         // _permit dropped here when function returns, releasing concurrency

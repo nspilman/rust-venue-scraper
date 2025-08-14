@@ -25,7 +25,9 @@ impl BlueMoonCrawler {
 
 #[async_trait::async_trait]
 impl EventApi for BlueMoonCrawler {
-    fn api_name(&self) -> &'static str { BLUE_MOON_API }
+    fn api_name(&self) -> &'static str {
+        BLUE_MOON_API
+    }
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
@@ -33,9 +35,9 @@ impl EventApi for BlueMoonCrawler {
         let payload = fetch_payload_and_log(BLUE_MOON_API).await?;
 
         let data: Value = serde_json::from_slice(&payload)?;
-        let events_by_date = data["eventsByDates"]
-            .as_object()
-            .ok_or_else(|| crate::error::ScraperError::MissingField("eventsByDates not found".into()))?;
+        let events_by_date = data["eventsByDates"].as_object().ok_or_else(|| {
+            crate::error::ScraperError::MissingField("eventsByDates not found".into())
+        })?;
 
         let mut all_events = Vec::new();
         for (day, events) in events_by_date {
@@ -48,7 +50,10 @@ impl EventApi for BlueMoonCrawler {
                 }
             }
         }
-        info!("Successfully fetched {} events from Blue Moon Tavern", all_events.len());
+        info!(
+            "Successfully fetched {} events from Blue Moon Tavern",
+            all_events.len()
+        );
         Ok(all_events)
     }
 

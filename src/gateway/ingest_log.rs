@@ -1,4 +1,5 @@
 use crate::envelope::StampedEnvelopeV1;
+use crate::metrics::IngestLogMetrics;
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -6,7 +7,9 @@ use std::path::Path;
 
 /// Backward-compatible append to a fixed path (no rotation)
 pub fn append(path: &Path, stamped: &StampedEnvelopeV1) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() { fs::create_dir_all(parent)?; }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     let line = serde_json::to_string(stamped)?;
     writeln!(file, "{}", line)?;
@@ -29,9 +32,26 @@ pub fn append_rotating(log_dir: &Path, stamped: &StampedEnvelopeV1) -> anyhow::R
     ensure_symlink_to_current(&symlink_path, &target_path)?;
 
     // Append to the target file
-    let mut file = OpenOptions::new().create(true).append(true).open(&target_path)?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&target_path)?;
     let line = serde_json::to_string(stamped)?;
-    writeln!(file, "{}", line)?;
+    match writeln!(file, "{}", line) {
+        Ok(_) => {
+            IngestLogMetrics::record_write_success(line.len());
+        }
+        Err(e) => {
+            IngestLogMetrics::record_write_error("write_failed");
+            return Err(e.into());
+        }
+    }
+
+    // Update current file size
+    if let Ok(metadata) = file.metadata() {
+        IngestLogMetrics::record_current_log_size(metadata.len());
+    }
+
     Ok(())
 }
 

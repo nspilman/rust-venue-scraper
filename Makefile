@@ -42,11 +42,6 @@ ingest: ## Run ingester (in-memory) for all crawlers
 ingest-db: ## Run ingester (database mode)
 	cargo run -- ingester --apis blue_moon,sea_monster,darrells_tavern --use-database
 
-carpenter: ## Run carpenter (database mode recommended)
-	cargo run -- carpenter --apis blue_moon --use-database
-
-run-full: ## Run full pipeline (ingester + carpenter) in database mode
-	cargo run -- run --apis blue_moon,sea_monster,darrells_tavern --use-database
 
 clear-db: ## Clear all data from the database (DANGEROUS)
 	cargo run -- clear-db

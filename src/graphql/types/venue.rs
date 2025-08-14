@@ -1,15 +1,15 @@
-use crate::carpenter::Venue as CarpenterVenue;
+use crate::domain::Venue as DomainVenue;
 use crate::graphql::schema::GraphQLContext;
 use async_graphql::{Context, FieldResult, Object, ID};
 
 /// GraphQL representation of a Venue
 #[derive(Clone)]
 pub struct Venue {
-    pub inner: CarpenterVenue,
+    pub inner: DomainVenue,
 }
 
-impl From<CarpenterVenue> for Venue {
-    fn from(venue: CarpenterVenue) -> Self {
+impl From<DomainVenue> for Venue {
+fn from(venue: DomainVenue) -> Self {
         Self { inner: venue }
     }
 }

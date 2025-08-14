@@ -1,15 +1,15 @@
-use crate::carpenter::Artist as CarpenterArtist;
+use crate::domain::Artist as DomainArtist;
 use crate::graphql::schema::GraphQLContext;
 use async_graphql::{Context, FieldResult, Object, ID};
 
 /// GraphQL representation of an Artist
 #[derive(Clone)]
 pub struct Artist {
-    pub inner: CarpenterArtist,
+    pub inner: DomainArtist,
 }
 
-impl From<CarpenterArtist> for Artist {
-    fn from(artist: CarpenterArtist) -> Self {
+impl From<DomainArtist> for Artist {
+fn from(artist: DomainArtist) -> Self {
         Self { inner: artist }
     }
 }

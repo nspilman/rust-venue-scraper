@@ -1,0 +1,57 @@
+services:
+  # Don't run the scraper in Docker - it will run locally
+  scraper:
+    profiles: ["disabled"]
+
+  # One-off ingester job for local dev, run with: docker compose -f docker-compose-local.yml run --rm ingester
+  ingester:
+    image: sms-scraper:latest
+    profiles: ["disabled"]
+    environment:
+      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
+      - SMS_METRICS_SCRAPE_URL=http://localhost:9464/metrics
+      - PROMETHEUS_ADDR=0.0.0.0:9464
+      - RUST_LOG=sms_scraper::metrics=info
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - pushgateway
+    entrypoint: ["/usr/local/bin/sms_scraper"]
+    command: ["ingester", "--apis", "blue_moon", "--bypass-cadence"]
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./ops/prometheus-local.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      pushgateway:
+        condition: service_started
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
