@@ -51,3 +51,13 @@ pub trait GatewayPort: Send + Sync {
     async fn accept(&self, env: crate::pipeline::ingestion::envelope::EnvelopeSubmissionV1, bytes: Vec<u8>) -> Result<crate::pipeline::ingestion::envelope::StampedEnvelopeV1, String>;
 }
 
+#[async_trait]
+pub trait IngestLogPort: Send + Sync {
+    // Placeholder for ingest log operations
+}
+
+#[async_trait]
+pub trait NormalizeOutputPort: Send + Sync {
+    async fn write_normalized_record(&self, record: &crate::pipeline::processing::normalize::NormalizedRecord) -> anyhow::Result<()>;
+}
+

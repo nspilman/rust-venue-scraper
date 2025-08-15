@@ -750,6 +750,38 @@ pub mod parser {
 }
 
 // ============================================================================
+// Normalize Metrics
+// ============================================================================
+
+pub mod normalize {
+    /// Record that a record was normalized with a specific strategy
+    pub fn record_normalized(strategy: &str) {
+        ::metrics::counter!("sms_normalize_records_processed_total", "strategy" => strategy.to_string()).increment(1);
+    }
+    
+    /// Record the confidence level of normalization
+    pub fn confidence_recorded(confidence: f64) {
+        ::metrics::histogram!("sms_normalize_confidence").record(confidence);
+    }
+    
+    /// Record that geocoding was performed
+    pub fn geocoding_performed() {
+        ::metrics::counter!("sms_normalize_geocoding_total").increment(1);
+    }
+    
+    /// Record a warning during normalization
+    pub fn warning_logged(warning: &str) {
+        ::metrics::counter!("sms_normalize_warnings_total", "warning_type" => warning.to_string()).increment(1);
+    }
+    
+    /// Record that a batch was processed
+    pub fn batch_processed(batch_size: usize) {
+        ::metrics::histogram!("sms_normalize_batch_size").record(batch_size as f64);
+        ::metrics::counter!("sms_normalize_batches_processed_total").increment(1);
+    }
+}
+
+// ============================================================================
 // Pushgateway Support (for short-lived jobs)
 // ============================================================================
 
