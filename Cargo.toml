@@ -13,6 +13,7 @@ path = "src/main.rs"
 name = "build-dashboard"
 path = "src/bin/build-dashboard.rs"
 
+
 [dependencies]
 # Async runtime and HTTP client
 tokio = { version = "1.0", features = ["full"] }

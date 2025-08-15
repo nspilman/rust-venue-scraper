@@ -51,13 +51,14 @@ pub enum MetricName {
     ParserBytesProcessed,
     ParserBatchSize,
     
-    // Push gateway metrics
-    IngestTimestamp,
-    IngestBytes,
-    IngestDurationSeconds,
-    IngestSuccess,
-    PushTimestamp,
-    MetricsInitialized,
+    // Normalize metrics
+    NormalizeRecordsProcessed,
+    NormalizeConfidence,
+    NormalizeGeocoding,
+    NormalizeWarnings,
+    NormalizeBatchesProcessed,
+    NormalizeBatchSize,
+    
 }
 
 impl fmt::Display for MetricName {
@@ -103,13 +104,14 @@ impl fmt::Display for MetricName {
             MetricName::ParserBytesProcessed => "sms_parser_bytes_processed",
             MetricName::ParserBatchSize => "sms_parser_batch_size",
             
-            // Push gateway metrics
-            MetricName::IngestTimestamp => "sms_ingest_timestamp_ms",
-            MetricName::IngestBytes => "sms_ingest_bytes",
-            MetricName::IngestDurationSeconds => "sms_ingest_duration_seconds",
-            MetricName::IngestSuccess => "sms_ingest_success",
-            MetricName::PushTimestamp => "sms_push_timestamp_ms",
-            MetricName::MetricsInitialized => "sms_metrics_initialized",
+            // Normalize metrics
+            MetricName::NormalizeRecordsProcessed => "sms_normalize_records_processed_total",
+            MetricName::NormalizeConfidence => "sms_normalize_confidence",
+            MetricName::NormalizeGeocoding => "sms_normalize_geocoding_total",
+            MetricName::NormalizeWarnings => "sms_normalize_warnings_total",
+            MetricName::NormalizeBatchesProcessed => "sms_normalize_batches_processed_total",
+            MetricName::NormalizeBatchSize => "sms_normalize_batch_size",
+            
         };
         write!(f, "{}", name)
     }
@@ -159,45 +161,17 @@ impl MetricName {
             MetricName::ParserBytesProcessed => "sms_parser_bytes_processed",
             MetricName::ParserBatchSize => "sms_parser_batch_size",
             
-            // Push gateway metrics
-            MetricName::IngestTimestamp => "sms_ingest_timestamp_ms",
-            MetricName::IngestBytes => "sms_ingest_bytes",
-            MetricName::IngestDurationSeconds => "sms_ingest_duration_seconds",
-            MetricName::IngestSuccess => "sms_ingest_success",
-            MetricName::PushTimestamp => "sms_push_timestamp_ms",
-            MetricName::MetricsInitialized => "sms_metrics_initialized",
+            // Normalize metrics
+            MetricName::NormalizeRecordsProcessed => "sms_normalize_records_processed_total",
+            MetricName::NormalizeConfidence => "sms_normalize_confidence",
+            MetricName::NormalizeGeocoding => "sms_normalize_geocoding_total",
+            MetricName::NormalizeWarnings => "sms_normalize_warnings_total",
+            MetricName::NormalizeBatchesProcessed => "sms_normalize_batches_processed_total",
+            MetricName::NormalizeBatchSize => "sms_normalize_batch_size",
+            
         }
     }
 
-    /// Convenience method to increment a counter metric
-    pub fn increment_counter(&self) {
-        ::metrics::counter!(self.as_str()).increment(1);
-    }
-
-    /// Convenience method to increment a counter metric by a specific amount
-    pub fn increment_counter_by(&self, value: u64) {
-        ::metrics::counter!(self.as_str()).increment(value);
-    }
-
-    /// Convenience method to record a histogram value
-    pub fn record_histogram(&self, value: f64) {
-        ::metrics::histogram!(self.as_str()).record(value);
-    }
-
-    /// Convenience method to set a gauge value
-    pub fn set_gauge(&self, value: f64) {
-        ::metrics::gauge!(self.as_str()).set(value);
-    }
-
-    /// Convenience method for counter with one label
-    pub fn increment_counter_with_label(&self, key: &'static str, value: String) {
-        ::metrics::counter!(self.as_str(), key => value).increment(1);
-    }
-
-    /// Convenience method for histogram with one label
-    pub fn record_histogram_with_label(&self, hist_value: f64, key: &'static str, value: String) {
-        ::metrics::histogram!(self.as_str(), key => value).record(hist_value);
-    }
 
     /// Get all metric names as an iterator (for dynamic dashboard generation)
     pub fn all_metrics() -> impl Iterator<Item = MetricName> {
@@ -242,6 +216,14 @@ impl MetricName {
             ParserRecordsExtracted,
             ParserBytesProcessed,
             ParserBatchSize,
+            
+            // Normalize metrics
+            NormalizeRecordsProcessed,
+            NormalizeConfidence,
+            NormalizeGeocoding,
+            NormalizeWarnings,
+            NormalizeBatchesProcessed,
+            NormalizeBatchSize,
             
             // Push gateway metrics (usually not displayed)
             // IngestTimestamp,
@@ -297,13 +279,14 @@ impl MetricName {
             MetricName::ParserBytesProcessed => ("parser", "Bytes processed", Some("bytes")),
             MetricName::ParserBatchSize => ("parser", "Parse batch size", None),
             
-            // Push gateway metrics
-            MetricName::IngestTimestamp => ("pushgateway", "Last ingest timestamp", Some("ms")),
-            MetricName::IngestBytes => ("pushgateway", "Ingest bytes", Some("bytes")),
-            MetricName::IngestDurationSeconds => ("pushgateway", "Ingest duration", Some("s")),
-            MetricName::IngestSuccess => ("pushgateway", "Ingest success flag", None),
-            MetricName::PushTimestamp => ("pushgateway", "Push timestamp", Some("ms")),
-            MetricName::MetricsInitialized => ("pushgateway", "Metrics initialized flag", None),
+            // Normalize metrics
+            MetricName::NormalizeRecordsProcessed => ("normalize", "Records processed with normalization", None),
+            MetricName::NormalizeConfidence => ("normalize", "Normalization confidence level", None),
+            MetricName::NormalizeGeocoding => ("normalize", "Geocoding operations performed", None),
+            MetricName::NormalizeWarnings => ("normalize", "Normalization warnings", None),
+            MetricName::NormalizeBatchesProcessed => ("normalize", "Batches processed", None),
+            MetricName::NormalizeBatchSize => ("normalize", "Normalization batch size", None),
+            
         }
     }
 
@@ -314,7 +297,7 @@ impl MetricName {
         
         if name.contains("_total") || name.contains("success") || name.contains("error") || name.contains("extracted") {
             MetricType::Counter
-        } else if name.contains("_seconds") || name.contains("_bytes") || name.contains("_duration") || name.contains("_size") {
+        } else if name.contains("_seconds") || name.contains("_bytes") || name.contains("_duration") || name.contains("_size") || name.contains("confidence") {
             MetricType::Histogram
         } else if name.contains("current_") || name.contains("active_") || name.contains("initialized") {
             MetricType::Gauge
@@ -646,7 +629,7 @@ pub mod gateway {
 // ============================================================================
 
 pub mod ingest_log {
-    use super::{push_single_metric, push_histogram_metric, MetricName};
+    use super::{push_single_metric, MetricName};
     
     /// Record successful write
     pub fn write_success() {
@@ -754,30 +737,49 @@ pub mod parser {
 // ============================================================================
 
 pub mod normalize {
+    use super::push_single_metric;
+    
     /// Record that a record was normalized with a specific strategy
     pub fn record_normalized(strategy: &str) {
-        ::metrics::counter!("sms_normalize_records_processed_total", "strategy" => strategy.to_string()).increment(1);
+        let metric_name = "sms_normalize_records_processed_total";
+        ::metrics::counter!(metric_name, "strategy" => strategy.to_string()).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
     
     /// Record the confidence level of normalization
     pub fn confidence_recorded(confidence: f64) {
         ::metrics::histogram!("sms_normalize_confidence").record(confidence);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
     }
     
     /// Record that geocoding was performed
     pub fn geocoding_performed() {
-        ::metrics::counter!("sms_normalize_geocoding_total").increment(1);
+        let metric_name = "sms_normalize_geocoding_total";
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
     
     /// Record a warning during normalization
     pub fn warning_logged(warning: &str) {
-        ::metrics::counter!("sms_normalize_warnings_total", "warning_type" => warning.to_string()).increment(1);
+        let metric_name = "sms_normalize_warnings_total";
+        ::metrics::counter!(metric_name, "warning_type" => warning.to_string()).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
     
     /// Record that a batch was processed
     pub fn batch_processed(batch_size: usize) {
         ::metrics::histogram!("sms_normalize_batch_size").record(batch_size as f64);
-        ::metrics::counter!("sms_normalize_batches_processed_total").increment(1);
+        let metric_name = "sms_normalize_batches_processed_total";
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
 }
 

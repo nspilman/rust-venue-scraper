@@ -24,7 +24,7 @@ impl NormalizeUseCase {
     /// Create a use case with the default normalizer
     pub fn with_default_normalizer(output: Box<dyn NormalizeOutputPort>) -> Self {
         Self {
-            normalizer: Box::new(DefaultNormalizer::new()),
+            normalizer: Box::new(DefaultNormalizer { geocoder: None }),
             output,
         }
     }

@@ -217,6 +217,7 @@ pub struct ParseParams {
     pub data_root: Option<String>,
     pub output: Option<String>,
     pub source_id: Option<String>,
+    pub normalize: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -257,8 +258,24 @@ pub async fn parse_run(
     let prefixed_path = dir.join(format!("{}_{}", ts, file.to_string_lossy()));
     let mut out = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&prefixed_path)?;
 
-    // Wire ports and use-case
-    let uc = ParseUseCase::new(Box::new(JsonRegistry), Box::new(CasPayloadStore), Box::new(DefaultParserFactory));
+    // Wire ports and use-cases
+    let parse_uc = ParseUseCase::new(Box::new(JsonRegistry), Box::new(CasPayloadStore), Box::new(DefaultParserFactory));
+    
+    // Optionally create normalize use case if normalization is enabled
+    let normalize_uc = if params.normalize.unwrap_or(false) {
+        use crate::app::normalize_use_case::NormalizeUseCase;
+        use crate::pipeline::processing::normalize::DefaultNormalizer;
+        use crate::infra::normalize_output_adapter::FileNormalizeOutputAdapter;
+        
+        let normalized_output = output.replace(".ndjson", "_normalized.ndjson");
+        let normalized_path = dir.join(format!("{}_{}", ts, Path::new(&normalized_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("normalized.ndjson")).to_string_lossy()));
+        let normalize_adapter = FileNormalizeOutputAdapter::new(&normalized_path.to_string_lossy())?;
+        
+        Some((NormalizeUseCase::new(Box::new(DefaultNormalizer { geocoder: None }), Box::new(normalize_adapter)), normalized_path))
+    } else {
+        None
+    };
+    
     use crate::app::ports::RegistryPort;
 
     let mut total_seen = 0usize;
@@ -302,7 +319,7 @@ pub async fn parse_run(
         let reg = crate::infra::registry_adapter::JsonRegistry;
         let plan = reg.load_parse_plan(&src_id).await.unwrap_or_else(|_| "parse_plan:wix_calendar_v1".to_string());
         info!("parser: parsing envelope_id={} src_id={} plan={} payload_ref={} ", envelope_id, src_id, plan, payload_ref_s);
-        let rec_lines = match uc.parse_one(&src_id, &envelope_id, &payload_ref_s).await {
+        let rec_lines = match parse_uc.parse_one(&src_id, &envelope_id, &payload_ref_s).await {
             Ok(lines) => {
                 crate::observability::metrics::parser::parse_success();
                 lines
@@ -315,8 +332,41 @@ pub async fn parse_run(
             }
         };
         if rec_lines.is_empty() { total_empty_records += 1; }
+        
+        // Write parsed records to output
         for line in rec_lines.iter() { use std::io::Write; writeln!(out, "{}", line)?; }
         total_written += rec_lines.len();
+        
+        // Optionally normalize parsed records
+        if let Some((ref norm_uc, _)) = normalize_uc {
+            if !rec_lines.is_empty() {
+                // Convert JSON lines to ParsedRecords for normalization
+                let parsed_records: Vec<crate::pipeline::processing::parser::ParsedRecord> = rec_lines
+                    .iter()
+                    .filter_map(|line| {
+                        match serde_json::from_str::<crate::pipeline::processing::parser::ParsedRecord>(line) {
+                            Ok(record) => Some(record),
+                            Err(e) => {
+                                warn!("normalize: failed to deserialize parsed record: {}", e);
+                                None
+                            }
+                        }
+                    })
+                    .collect();
+                
+                if !parsed_records.is_empty() {
+                    info!("normalize: processing {} parsed records from envelope_id={}", parsed_records.len(), envelope_id);
+                    match norm_uc.normalize_batch(&parsed_records).await {
+                        Ok(_) => {
+                            info!("normalize: successfully normalized batch from envelope_id={}", envelope_id);
+                        },
+                        Err(e) => {
+                            warn!("normalize: failed to normalize batch from envelope_id={}: {}", envelope_id, e);
+                        }
+                    }
+                }
+            }
+        }
         
         // Record gateway metrics for records ingested from this envelope
         if !rec_lines.is_empty() {

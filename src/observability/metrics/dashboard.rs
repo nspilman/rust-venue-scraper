@@ -210,6 +210,51 @@ impl DashboardBuilder {
                 phase: "parser".to_string(),
             });
 
+        // Normalize metrics
+        builder = builder
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeRecordsProcessed.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Records processed with normalization".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeConfidence.to_string(),
+                metric_type: MetricType::Histogram,
+                description: "Normalization confidence level".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeGeocoding.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Geocoding operations performed".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeWarnings.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Normalization warnings".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeBatchesProcessed.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Batches processed".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::NormalizeBatchSize.to_string(),
+                metric_type: MetricType::Histogram,
+                description: "Normalization batch size".to_string(),
+                unit: None,
+                phase: "normalize".to_string(),
+            });
+
         builder
     }
 

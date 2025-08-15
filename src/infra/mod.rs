@@ -5,4 +5,5 @@ pub mod http_client;
 pub mod rate_limiter_adapter;
 pub mod cadence_adapter;
 pub mod gateway_adapter;
+pub mod normalize_output_adapter;
 

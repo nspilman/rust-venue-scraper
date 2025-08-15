@@ -66,11 +66,6 @@ pub struct DefaultNormalizer {
 }
 
 impl DefaultNormalizer {
-    pub fn new() -> Self {
-        Self {
-            geocoder: None,
-        }
-    }
 
     /// Extract event information from a parsed record
     fn extract_event(&self, record: &ParsedRecord) -> anyhow::Result<Option<Event>> {
@@ -173,7 +168,7 @@ impl DefaultNormalizer {
             .to_string();
 
         // Extract or geocode coordinates
-        let (latitude, longitude, geocoded) = if let (Some(lat), Some(lng)) = (
+        let (latitude, longitude, _geocoded) = if let (Some(lat), Some(lng)) = (
             data.get("latitude").and_then(|v| v.as_f64()),
             data.get("longitude").and_then(|v| v.as_f64())
         ) {
@@ -363,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_normalize_simple_event() {
-        let normalizer = DefaultNormalizer::new();
+        let normalizer = DefaultNormalizer { geocoder: None };
         
         let record = ParsedRecord {
             source_id: "test_source".to_string(),
@@ -395,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_normalize_multiple_artists() {
-        let normalizer = DefaultNormalizer::new();
+        let normalizer = DefaultNormalizer { geocoder: None };
         
         let record = ParsedRecord {
             source_id: "test_source".to_string(),
