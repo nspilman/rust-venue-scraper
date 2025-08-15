@@ -682,7 +682,12 @@ pub mod ingest_log {
     
     /// Set current file size
     pub fn current_file_bytes(bytes: u64) {
-        ::metrics::gauge!(MetricName::IngestLogCurrentFileBytes.as_str()).set(bytes as f64);
+        let metric_name = MetricName::IngestLogCurrentFileBytes.as_str();
+        ::metrics::gauge!(metric_name).set(bytes as f64);
+        let b = bytes as f64;
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, b, "gauge").await;
+        });
     }
     
     /// Set active consumers count
