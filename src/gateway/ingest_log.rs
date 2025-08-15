@@ -1,5 +1,4 @@
 use crate::envelope::StampedEnvelopeV1;
-use crate::metrics::IngestLogMetrics;
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -39,17 +38,18 @@ pub fn append_rotating(log_dir: &Path, stamped: &StampedEnvelopeV1) -> anyhow::R
     let line = serde_json::to_string(stamped)?;
     match writeln!(file, "{}", line) {
         Ok(_) => {
-            IngestLogMetrics::record_write_success(line.len());
+            crate::metrics::ingest_log::write_success();
+            crate::metrics::ingest_log::write_bytes(line.len());
         }
         Err(e) => {
-            IngestLogMetrics::record_write_error("write_failed");
+            crate::metrics::ingest_log::write_error();
             return Err(e.into());
         }
     }
 
     // Update current file size
     if let Ok(metadata) = file.metadata() {
-        IngestLogMetrics::record_current_log_size(metadata.len());
+        crate::metrics::ingest_log::current_file_bytes(metadata.len());
     }
 
     Ok(())

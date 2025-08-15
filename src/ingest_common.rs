@@ -7,11 +7,6 @@ use crate::idempotency::compute_idempotency_key;
 use crate::ingest_meta::IngestMeta;
 use crate::rate_limiter::{Limits, RateLimiter};
 use crate::registry::load_source_spec;
-// Note: accessing metrics from the main binary
-use crate::metrics::{
-    gateway::GatewayMetrics, ingest_log::IngestLogMetrics, sources::CadenceResult,
-    sources::SourcesMetrics,
-};
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use std::path::Path;
 use std::time::Instant;
@@ -29,11 +24,11 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
 
     let spec = match load_source_spec(&reg_path) {
         Ok(spec) => {
-            SourcesMetrics::record_registry_load_success(source_id);
+            crate::metrics::sources::registry_load_success();
             spec
         }
         Err(e) => {
-            SourcesMetrics::record_registry_load_error(source_id, "load_failed");
+            crate::metrics::sources::registry_load_error();
             return Err(ScraperError::Api {
                 message: format!("Failed to load registry for {}: {}", source_id, e),
             });
@@ -68,15 +63,15 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
                 })?
         {
             if now - last < min_interval_secs {
-                SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Skipped);
+                // Cadence skipped
                 return Err(ScraperError::Api {
                     message: "cadence_skip: fetched within last 12h".into(),
                 });
             }
         }
-        SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Allowed);
+        // Cadence allowed
     } else {
-        SourcesMetrics::record_cadence_check(&spec.source_id, CadenceResult::Bypassed);
+        // Cadence bypassed
     }
 
     // 3) Fetch bytes and headers with rate limiting per registry
@@ -95,12 +90,14 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let payload = bytes.to_vec();
     rl.acquire(payload.len() as u64).await; // account for bytes after size known
 
-    // Record metrics using the structured metrics system
+    // Record metrics
     let dur = fetch_t0.elapsed().as_secs_f64();
     if (200..=299).contains(&status) {
-        SourcesMetrics::record_request_success(&spec.source_id, dur, payload.len());
+        crate::metrics::sources::request_success();
+        crate::metrics::sources::request_duration(dur);
+        crate::metrics::sources::payload_bytes(payload.len());
     } else {
-        SourcesMetrics::record_request_error(&spec.source_id, "http_error");
+        crate::metrics::sources::request_error();
     }
 
     let content_type = headers
@@ -195,7 +192,7 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let gw = Gateway::new(data_root.clone());
     let accept_start = Instant::now();
     let stamped = gw.accept(env, &payload).map_err(|e| {
-        GatewayMetrics::record_cas_write_error("local", "accept_failed");
+        crate::metrics::gateway::cas_write_error();
         ScraperError::Api {
             message: format!("Gateway accept failed: {}", e),
         }
@@ -204,13 +201,11 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let accept_duration = accept_start.elapsed().as_secs_f64();
 
     // Record successful gateway and ingest log metrics
-    GatewayMetrics::record_envelope_accepted(
-        &stamped.envelope.source_id,
-        payload.len(),
-        accept_duration,
-    );
-    GatewayMetrics::record_cas_write_success("local", payload.len());
-    IngestLogMetrics::record_write_success(payload.len());
+    crate::metrics::gateway::envelope_accepted();
+    crate::metrics::gateway::processing_duration(accept_duration);
+    crate::metrics::gateway::cas_write_success();
+    crate::metrics::ingest_log::write_success();
+    crate::metrics::ingest_log::write_bytes(payload.len());
 
     debug!(
         "Accepted envelope {} with payload {}",

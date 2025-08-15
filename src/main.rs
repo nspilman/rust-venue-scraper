@@ -215,20 +215,19 @@ async fn run_apis(
 
             // Metrics: mark run start and time the pipeline execution per API
             let started = std::time::Instant::now();
-            // Use new Sources metrics for ingest runs
-            crate::metrics::SourcesMetrics::record_registry_load_success("");
+            // Record registry load
+            crate::metrics::sources::registry_load_success();
 
             match Pipeline::run_for_api_with_storage(crawler, output_dir, storage.clone()).await {
                 Ok(result) => {
                     // Metrics: record successful duration and outcome counts
-                    // Use new Parser metrics for processing outcomes
-                    crate::metrics::ParserMetrics::record_batch_run_success(
-                        result.processed_events,
-                        started.elapsed().as_secs_f64(),
-                    );
-                    crate::metrics::ParserMetrics::record_envelopes_skipped(result.skipped_events);
+                    let duration = started.elapsed().as_secs_f64();
+                    crate::metrics::parser::parse_success();
+                    crate::metrics::parser::duration(duration);
+                    crate::metrics::parser::records_extracted(result.processed_events as u64);
+                    
                     if result.errors.len() > 0 {
-                        crate::metrics::ParserMetrics::record_parse_error("", "", "pipeline_error");
+                        crate::metrics::parser::parse_error();
                     }
 
                     info!("Pipeline finished");
@@ -251,8 +250,8 @@ async fn run_apis(
                     }
                 }
                 Err(e) => {
-                    // Metrics: record failed duration and a failure counter
-                    crate::metrics::ParserMetrics::record_parse_error("", "", "pipeline_failure");
+                    // Metrics: record failure
+                    crate::metrics::parser::parse_error();
 
                     error!("Pipeline failed: {}", e);
                 }
@@ -286,10 +285,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if bypass_cadence {
                 std::env::set_var("SMS_BYPASS_CADENCE", "1");
             }
-            // Initialize metrics recorder for short-lived ingester runs (no HTTP exporter by default)
-            crate::metrics::init_metrics();
+            // Initialize metrics system
+            crate::metrics::init().unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to initialize metrics: {}", e);
+            });
             // Heartbeat to ensure snapshot is non-empty for short runs
-            crate::metrics::bump_run_heartbeat();
+            crate::metrics::heartbeat();
 
             let api_names: Vec<String> = if let Some(api_list) = apis {
                 api_list.split(',').map(|s| s.trim().to_string()).collect()
@@ -303,15 +304,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let storage = create_storage(use_database).await?;
             run_apis(&api_names, output_dir, storage).await?;
+            
+            // Push all collected metrics to Pushgateway before exit
+            info!("Pushing metrics to Pushgateway...");
+            if let Err(e) = crate::metrics::push_all_metrics().await {
+                warn!("Failed to push metrics: {}", e);
+            } else {
+                info!("Successfully pushed metrics to Pushgateway");
+            }
         }
         Commands::Server { port, metrics_addr, use_database } => {
             println!("🚀 Starting GraphQL API server on port {port}...");
 
-            // Initialize Prometheus exporter only for server
+            // Initialize metrics with server address
             if let Some(addr) = metrics_addr.as_deref() {
                 std::env::set_var("SMS_METRICS_ADDR", addr);
             }
-            crate::metrics::init_metrics();
+            crate::metrics::init().unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to initialize metrics: {}", e);
+            });
 
             let storage = create_storage(use_database).await?;
 
@@ -384,11 +395,15 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
             use crate::app::ports::HttpClientPort as _;
             use crate::registry::load_source_spec;
 
-            // Initialize metrics for this one-shot command
-            crate::metrics::init_metrics();
-            crate::metrics::bump_run_heartbeat();
-
             let source = source_id.unwrap_or_else(|| constants::BLUE_MOON_API.to_string());
+            
+            // Initialize metrics with push gateway support
+            std::env::set_var("SMS_PUSHGATEWAY_URL", "http://localhost:9091");
+            crate::metrics::init_with_push_options(Some("sms_scraper"), Some(&source))
+                .unwrap_or_else(|e| {
+                    eprintln!("Warning: Failed to initialize metrics: {}", e);
+                });
+            crate::metrics::heartbeat();
             if bypass_cadence { std::env::set_var("SMS_BYPASS_CADENCE", "1"); }
             let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
             let reg_path = base.join("registry/sources").join(format!("{}.json", source));
@@ -430,29 +445,23 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
                     println!("📦 CAS root: {}/cas", data_root_path_from_arg(&data_root).display());
                     
                     // Push detailed metrics to Pushgateway
-                    info!("MAIN: Pushing detailed metrics for successful ingest");
-                    crate::metrics::push_ingest_metrics(
-                        &spec.source_id,
-                        bytes,
-                        duration_secs,
-                        true,  // success
-                        &envelope_id,
-                    ).await;
-                    info!("MAIN: Finished push attempt");
+                    // Push ALL collected metrics to Pushgateway
+                    info!("Pushing all metrics to Pushgateway...");
+                    if let Err(e) = crate::metrics::push_all_metrics_with_instance(&spec.source_id).await {
+                        warn!("Failed to push metrics: {}", e);
+                    } else {
+                        info!("Successfully pushed all metrics to Pushgateway");
+                    }
                 }
                 Err(e) => {
                     let duration_secs = start_time.elapsed().as_secs_f64();
                     println!("❌ ingest_failed after {:.2}s: {}", duration_secs, e);
                     
                     // Push failure metrics
-                    info!("MAIN: Pushing failure metrics");
-                    crate::metrics::push_ingest_metrics(
-                        &spec.source_id,
-                        0,  // no bytes on failure
-                        duration_secs,
-                        false,  // failure
-                        "error",  // no envelope id on error
-                    ).await;
+                    info!("Pushing failure metrics to Pushgateway...");
+                    if let Err(e) = crate::metrics::push_all_metrics_with_instance(&spec.source_id).await {
+                        warn!("Failed to push metrics: {}", e);
+                    }
                 }
             }
         }
@@ -525,23 +534,44 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
             }
         }
         Commands::Parse { consumer, max, data_root, output, source_id } => {
+            // Initialize metrics system
+            crate::metrics::init().unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to initialize metrics: {}", e);
+            });
+            crate::metrics::heartbeat();
+            
             // Delegate to tasks::parse_run, which now uses a centralized ParseUseCase
             let params = crate::tasks::ParseParams {
                 consumer: Some(consumer),
                 max: Some(max),
                 data_root: Some(data_root),
                 output: Some(output.clone()),
-                source_id,
+                source_id: source_id.clone(),
             };
             let storage = std::sync::Arc::new(InMemoryStorage::new()) as std::sync::Arc<dyn Storage>;
             match crate::tasks::parse_run(storage, params).await {
                 Ok(summary) => {
                     println!("parse_done -> {}", summary.output_file);
                     println!("seen={} filtered_out={} empty_record_envelopes={} written_records={}", summary.seen, summary.filtered_out, summary.empty_record_envelopes, summary.written_records);
+                    
+                    // Push metrics to Pushgateway
+                    let instance = source_id.as_deref().unwrap_or("parser");
+                    info!("Pushing parser metrics to Pushgateway for instance {}...", instance);
+                    if let Err(e) = crate::metrics::push_all_metrics_with_instance(instance).await {
+                        warn!("Failed to push metrics: {}", e);
+                    } else {
+                        info!("Successfully pushed metrics to Pushgateway");
+                    }
                 }
                 Err(e) => {
                     error!("Parse run failed: {}", e);
                     println!("❌ Parse run failed: {e}");
+                    
+                    // Still push metrics even on failure
+                    let instance = source_id.as_deref().unwrap_or("parser");
+                    if let Err(e) = crate::metrics::push_all_metrics_with_instance(instance).await {
+                        warn!("Failed to push metrics: {}", e);
+                    }
                 }
             }
         }

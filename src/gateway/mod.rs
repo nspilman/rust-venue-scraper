@@ -4,7 +4,6 @@ pub mod ingest_log;
 
 use crate::envelope::{EnvelopeSubmissionV1, StampedEnvelopeV1};
 use crate::ingest_meta::IngestMeta;
-use crate::metrics::GatewayMetrics;
 use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;
@@ -37,7 +36,7 @@ impl Gateway {
         let meta = IngestMeta::open_at_root(&self.root)?;
         let idk = env.idempotency_key.clone();
         if let Some(existing_id) = meta.get_envelope_by_idk(&idk)? {
-            GatewayMetrics::record_envelope_deduplicated(&env.source_id);
+            crate::metrics::gateway::envelope_deduplicated();
             let accepted_at = Utc::now();
             let envelope_id = Uuid::new_v4().to_string();
             let dup = StampedEnvelopeV1 {
@@ -56,13 +55,12 @@ impl Gateway {
             };
             ingest_log::append_rotating(&self.root.join("ingest_log"), &dup)?;
             let dur = t0.elapsed().as_secs_f64();
-            GatewayMetrics::record_processing_duration(&env.source_id, dur);
+            crate::metrics::gateway::processing_duration(dur);
             return Ok(dup);
         }
 
         let bytes = payload_bytes.len();
-        let processing_duration_secs = 0.0; // Will be updated at the end
-        GatewayMetrics::record_envelope_accepted(&env.source_id, bytes, processing_duration_secs);
+        crate::metrics::gateway::envelope_accepted();
         let accepted_at = Utc::now();
         let envelope_id = Uuid::new_v4().to_string();
 
@@ -75,22 +73,18 @@ impl Gateway {
         {
             let result = cas_supabase::write_cas_supabase(payload_bytes);
             match &result {
-                Ok(_) => GatewayMetrics::record_cas_write_success("supabase", payload_bytes.len()),
-                Err(_) => GatewayMetrics::record_cas_write_error("supabase", "write_failed"),
+                Ok(_) => crate::metrics::gateway::cas_write_success(),
+                Err(_) => crate::metrics::gateway::cas_write_error(),
             }
             result?
         } else {
             let result = cas_fs::write_cas(&self.root.join("cas"), payload_bytes);
             match &result {
-                Ok(_) => {
-                    GatewayMetrics::record_cas_write_success("filesystem", payload_bytes.len())
-                }
-                Err(_) => GatewayMetrics::record_cas_write_error("filesystem", "write_failed"),
+                Ok(_) => crate::metrics::gateway::cas_write_success(),
+                Err(_) => crate::metrics::gateway::cas_write_error(),
             }
             result?
         };
-        let cas_dur = cas_t0.elapsed().as_secs_f64();
-        GatewayMetrics::record_cas_operation_duration("write", cas_dur);
 
         let stamped = StampedEnvelopeV1 {
             envelope_version: env.envelope_version.clone(),
@@ -112,7 +106,7 @@ impl Gateway {
         meta.put_dedupe_mapping(&idk, &envelope_id)?;
 
         let dur = t0.elapsed().as_secs_f64();
-        GatewayMetrics::record_processing_duration(&env.source_id, dur);
+        crate::metrics::gateway::processing_duration(dur);
         Ok(stamped)
     }
 }

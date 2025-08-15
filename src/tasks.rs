@@ -6,7 +6,6 @@ use crate::gateway::Gateway;
 use crate::idempotency::compute_idempotency_key;
 use crate::ingest_log_reader::IngestLogReader;
 use crate::ingest_meta::IngestMeta;
-use crate::metrics::{IngestLogMetrics, ParserMetrics, SourcesMetrics};
 use crate::rate_limiter::{Limits, RateLimiter};
 use crate::registry::load_source_spec;
 use crate::storage::Storage;
@@ -58,11 +57,11 @@ pub async fn gateway_once(
         .join(format!("{}.json", source));
     let spec = match load_source_spec(&reg_path) {
         Ok(spec) => {
-            SourcesMetrics::record_registry_load_success(&source);
+            crate::metrics::sources::registry_load_success();
             spec
         }
         Err(e) => {
-            SourcesMetrics::record_registry_load_error(&source, "load_failed");
+            crate::metrics::sources::registry_load_error();
             return Err(format!("Failed to load registry: {e}").into());
         }
     };
@@ -73,7 +72,6 @@ pub async fn gateway_once(
 
     // Cadence check
     let data_root = data_root_path_from_arg(params.data_root.as_deref().unwrap_or("data"));
-    // SourcesMetrics::record_cadence_check() - TODO: implement proper cadence metrics
     let bypass = std::env::var("SMS_BYPASS_CADENCE")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -105,9 +103,11 @@ pub async fn gateway_once(
 
     let dur = t0.elapsed().as_secs_f64();
     if (200..=299).contains(&status) {
-        SourcesMetrics::record_request_success(&source, dur, bytes.len());
+        crate::metrics::sources::request_success();
+        crate::metrics::sources::request_duration(dur);
+        crate::metrics::sources::payload_bytes(bytes.len());
     } else {
-        SourcesMetrics::record_request_error(&source, "http_error");
+        crate::metrics::sources::request_error();
     }
 
     let content_type = headers
@@ -245,8 +245,7 @@ pub async fn parse_run(
     let reader = IngestLogReader::new(data_root_path_from_arg(&data_root_s));
     let (lines, _last) = reader.read_next(&consumer, max)?;
     info!("parser: read {} log lines from ingest log", lines.len());
-    ParserMetrics::record_batch_run(&consumer, lines.len(), 0);
-    IngestLogMetrics::record_consumer_read(&consumer, lines.len());
+    crate::metrics::parser::batch_size(lines.len());
     if lines.is_empty() {
         return Ok(ParseResultSummary { seen: 0, filtered_out: 0, empty_record_envelopes: 0, written_records: 0, output_file: "".to_string() });
     }
@@ -313,8 +312,8 @@ pub async fn parse_run(
         total_written += rec_lines.len();
     }
 
-    // Push full exporter snapshot to Pushgateway tagged as 'parse' (optional)
-    crate::metrics::push_all_to_pushgateway("parse").await;
+    // Record final parsing metrics
+    crate::metrics::parser::records_extracted(total_written as u64);
 
     Ok(ParseResultSummary { seen: total_seen, filtered_out: total_filtered, empty_record_envelopes: total_empty_records, written_records: total_written, output_file: prefixed_path.to_string_lossy().to_string() })
 }
