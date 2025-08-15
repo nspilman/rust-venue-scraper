@@ -5,6 +5,7 @@
 
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use super::MetricName;
 
 /// Represents a metric type for dashboard panel generation
 #[allow(dead_code)]
@@ -59,7 +60,7 @@ impl DashboardBuilder {
         self
     }
 
-    /// Create from our metrics catalog
+    /// Create from our metrics catalog (static version)
     #[allow(dead_code)]
     pub fn from_catalog() -> Self {
         let mut builder = Self::new("SMS Scraper Metrics Dashboard");
@@ -67,35 +68,35 @@ impl DashboardBuilder {
         // Sources metrics
         builder = builder
             .add_metric(MetricDef {
-                name: "sms_sources_requests_success_total".to_string(),
+                name: MetricName::SourcesRequestsSuccess.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Total successful source requests".to_string(),
                 unit: None,
                 phase: "sources".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_sources_requests_error_total".to_string(),
+                name: MetricName::SourcesRequestsError.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Total failed source requests".to_string(),
                 unit: None,
                 phase: "sources".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_sources_request_duration_seconds".to_string(),
+                name: MetricName::SourcesRequestDuration.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Request duration in seconds".to_string(),
                 unit: Some("s".to_string()),
                 phase: "sources".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_sources_payload_bytes".to_string(),
+                name: MetricName::SourcesPayloadBytes.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Payload size in bytes".to_string(),
                 unit: Some("bytes".to_string()),
                 phase: "sources".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_sources_registry_loads_success_total".to_string(),
+                name: MetricName::SourcesRegistryLoadsSuccess.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Successful registry loads".to_string(),
                 unit: None,
@@ -105,35 +106,42 @@ impl DashboardBuilder {
         // Gateway metrics
         builder = builder
             .add_metric(MetricDef {
-                name: "sms_gateway_envelopes_accepted_total".to_string(),
+                name: MetricName::GatewayEnvelopesAccepted.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Total envelopes accepted".to_string(),
                 unit: None,
                 phase: "gateway".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_gateway_envelopes_deduplicated_total".to_string(),
+                name: MetricName::GatewayEnvelopesDeduplicated.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Total envelopes deduplicated".to_string(),
                 unit: None,
                 phase: "gateway".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_gateway_cas_writes_success_total".to_string(),
+                name: MetricName::GatewayCasWritesSuccess.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Successful CAS writes".to_string(),
                 unit: None,
                 phase: "gateway".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_gateway_processing_duration_seconds".to_string(),
+                name: MetricName::GatewayRecordsIngested.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Total records ingested".to_string(),
+                unit: None,
+                phase: "gateway".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::GatewayProcessingDuration.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Gateway processing duration".to_string(),
                 unit: Some("s".to_string()),
                 phase: "gateway".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_gateway_bytes_ingested".to_string(),
+                name: MetricName::GatewayBytesIngested.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Bytes ingested per source".to_string(),
                 unit: Some("bytes".to_string()),
@@ -143,21 +151,21 @@ impl DashboardBuilder {
         // Ingest log metrics
         builder = builder
             .add_metric(MetricDef {
-                name: "sms_ingest_log_writes_success_total".to_string(),
+                name: MetricName::IngestLogWritesSuccess.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Successful log writes".to_string(),
                 unit: None,
                 phase: "ingest_log".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_ingest_log_write_bytes".to_string(),
+                name: MetricName::IngestLogWriteBytes.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Log write size".to_string(),
                 unit: Some("bytes".to_string()),
                 phase: "ingest_log".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_ingest_log_current_file_bytes".to_string(),
+                name: MetricName::IngestLogCurrentFileBytes.to_string(),
                 metric_type: MetricType::Gauge,
                 description: "Current log file size".to_string(),
                 unit: Some("bytes".to_string()),
@@ -167,35 +175,35 @@ impl DashboardBuilder {
         // Parser metrics
         builder = builder
             .add_metric(MetricDef {
-                name: "sms_parser_parse_success_total".to_string(),
+                name: MetricName::ParserParseSuccess.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Successful parses".to_string(),
                 unit: None,
                 phase: "parser".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_parser_parse_error_total".to_string(),
+                name: MetricName::ParserParseError.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Parse errors".to_string(),
                 unit: None,
                 phase: "parser".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_parser_duration_seconds".to_string(),
+                name: MetricName::ParserDuration.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Parse duration".to_string(),
                 unit: Some("s".to_string()),
                 phase: "parser".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_parser_records_extracted_total".to_string(),
+                name: MetricName::ParserRecordsExtracted.to_string(),
                 metric_type: MetricType::Counter,
                 description: "Records extracted".to_string(),
                 unit: None,
                 phase: "parser".to_string(),
             })
             .add_metric(MetricDef {
-                name: "sms_parser_batch_size".to_string(),
+                name: MetricName::ParserBatchSize.to_string(),
                 metric_type: MetricType::Histogram,
                 description: "Parse batch size".to_string(),
                 unit: None,
@@ -205,46 +213,130 @@ impl DashboardBuilder {
         builder
     }
 
+    /// Create dashboard dynamically from the MetricName enum
+    /// This automatically discovers all metrics and generates appropriate panels
+    #[allow(dead_code)]
+    pub fn from_metrics_enum() -> Self {
+        let mut builder = Self::new("SMS Scraper Metrics Dashboard (Auto-Generated)");
+        
+        // Iterate through all metrics in the enum
+        for metric in super::MetricName::all_metrics() {
+            let (phase, description, unit) = metric.metadata();
+            let metric_type = metric.infer_metric_type();
+            
+            builder = builder.add_metric(MetricDef {
+                name: metric.to_string(),
+                metric_type,
+                description: description.to_string(),
+                unit: unit.map(|u| u.to_string()),
+                phase: phase.to_string(),
+            });
+        }
+        
+        builder
+    }
+
     /// Generate a Grafana panel for a counter metric
     fn generate_counter_panel(&self, metric: &MetricDef, panel_id: u32, x: u32, y: u32) -> Value {
-        json!({
-            "id": panel_id,
-            "gridPos": {
-                "x": x,
-                "y": y,
-                "w": 12,
-                "h": 8
-            },
-            "type": "graph",
-            "title": metric.description.clone(),
-            "datasource": self.datasource.clone(),
-            "targets": [
-                {
-                    "expr": format!("rate({}[5m])", metric.name),
-                    "legendFormat": "{{instance}}",
-                    "refId": "A"
+        // Determine if this should be a cumulative counter or rate counter
+        // Cumulative counters: totals, extracted, ingested, success, error counts
+        // Rate counters: requests, writes, operations that benefit from per-second rates
+        let should_show_cumulative = metric.name.contains("_total") || 
+                                   metric.name.contains("extracted") || 
+                                   metric.name.contains("ingested") || 
+                                   metric.description.to_lowercase().contains("total");
+        
+        if should_show_cumulative {
+            // Show cumulative total value
+            json!({
+                "id": panel_id,
+                "gridPos": {
+                    "x": x,
+                    "y": y,
+                    "w": 12,
+                    "h": 8
+                },
+                "type": "stat",
+                "title": metric.description.clone(),
+                "datasource": self.datasource.clone(),
+                "targets": [
+                    {
+                        "expr": metric.name.clone(),
+                        "legendFormat": "{{instance}}",
+                        "refId": "A"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "short",
+                        "thresholds": {
+                            "mode": "absolute",
+                            "steps": [
+                                {
+                                    "color": "green",
+                                    "value": null
+                                },
+                                {
+                                    "color": "yellow",
+                                    "value": 1000
+                                },
+                                {
+                                    "color": "red",
+                                    "value": 10000
+                                }
+                            ]
+                        }
+                    }
+                },
+                "options": {
+                    "orientation": "auto",
+                    "textMode": "auto",
+                    "colorMode": "background",
+                    "graphMode": "area",
+                    "justifyMode": "auto"
                 }
-            ],
-            "fieldConfig": {
-                "defaults": {
-                    "unit": "ops",
-                    "custom": {
-                        "drawStyle": "line",
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
-                        "fillOpacity": 10,
-                        "spanNulls": true
+            })
+        } else {
+            // Show rate of change
+            json!({
+                "id": panel_id,
+                "gridPos": {
+                    "x": x,
+                    "y": y,
+                    "w": 12,
+                    "h": 8
+                },
+                "type": "graph",
+                "title": format!("{} (Rate)", metric.description),
+                "datasource": self.datasource.clone(),
+                "targets": [
+                    {
+                        "expr": format!("rate({}[5m])", metric.name),
+                        "legendFormat": "{{instance}}",
+                        "refId": "A"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "ops",
+                        "custom": {
+                            "drawStyle": "line",
+                            "lineInterpolation": "linear",
+                            "lineWidth": 1,
+                            "fillOpacity": 10,
+                            "spanNulls": true
+                        }
+                    }
+                },
+                "options": {
+                    "legend": {
+                        "calcs": ["mean", "lastNotNull"],
+                        "displayMode": "table",
+                        "placement": "bottom"
                     }
                 }
-            },
-            "options": {
-                "legend": {
-                    "calcs": ["mean", "lastNotNull"],
-                    "displayMode": "table",
-                    "placement": "bottom"
-                }
-            }
-        })
+            })
+        }
     }
 
     /// Generate a Grafana panel for a histogram metric
@@ -410,43 +502,40 @@ impl DashboardBuilder {
             }
         }
         
-        // Build the complete dashboard
+        // Build the complete dashboard JSON (for Grafana provisioning)
         json!({
-            "dashboard": {
-                "id": null,
-                "uid": null,
-                "title": self.title.clone(),
-                "tags": ["sms-scraper", "generated"],
-                "timezone": "browser",
-                "schemaVersion": 27,
-                "version": 0,
-                "refresh": "10s",
-                "time": {
-                    "from": "now-1h",
-                    "to": "now"
-                },
-                "timepicker": {
-                    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
-                },
-                "templating": {
-                    "list": []
-                },
-                "annotations": {
-                    "list": [
-                        {
-                            "builtIn": 1,
-                            "datasource": "-- Grafana --",
-                            "enable": true,
-                            "hide": true,
-                            "iconColor": "rgba(0, 211, 255, 1)",
-                            "name": "Annotations & Alerts",
-                            "type": "dashboard"
-                        }
-                    ]
-                },
-                "panels": panels
+            "id": null,
+            "uid": null,
+            "title": self.title.clone(),
+            "tags": ["sms-scraper", "generated"],
+            "timezone": "browser",
+            "schemaVersion": 27,
+            "version": 0,
+            "refresh": "10s",
+            "time": {
+                "from": "now-1h",
+                "to": "now"
             },
-            "overwrite": true
+            "timepicker": {
+                "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+            },
+            "templating": {
+                "list": []
+            },
+            "annotations": {
+                "list": [
+                    {
+                        "builtIn": 1,
+                        "datasource": "-- Grafana --",
+                        "enable": true,
+                        "hide": true,
+                        "iconColor": "rgba(0, 211, 255, 1)",
+                        "name": "Annotations & Alerts",
+                        "type": "dashboard"
+                    }
+                ]
+            },
+            "panels": panels
         })
     }
 }

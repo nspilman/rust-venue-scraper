@@ -5,6 +5,326 @@
 
 pub mod dashboard;
 
+use std::fmt;
+
+/// Enum representing all metric names used in the system
+/// This eliminates magic strings and provides compile-time safety
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MetricName {
+    // Heartbeat
+    Heartbeat,
+    
+    // Sources metrics
+    SourcesRequestsSuccess,
+    SourcesRequestsError,
+    SourcesRequestDuration,
+    SourcesPayloadBytes,
+    SourcesRegistryLoadsSuccess,
+    SourcesRegistryLoadsError,
+    
+    // Gateway metrics
+    GatewayEnvelopesAccepted,
+    GatewayEnvelopesDeduplicated,
+    GatewayCasWritesSuccess,
+    GatewayCasWritesError,
+    GatewayRecordsIngested,
+    GatewayProcessingDuration,
+    GatewayIngestSuccess,
+    GatewayIngestError,
+    GatewayBytesIngested,
+    GatewayIngestDuration,
+    GatewayEnvelopeCreated,
+    
+    // Ingest log metrics
+    IngestLogWritesSuccess,
+    IngestLogWritesError,
+    IngestLogWriteBytes,
+    IngestLogRotations,
+    IngestLogCurrentFileBytes,
+    IngestLogActiveConsumers,
+    
+    // Parser metrics
+    ParserParseSuccess,
+    ParserParseError,
+    ParserDuration,
+    ParserRecordsExtracted,
+    ParserBytesProcessed,
+    ParserBatchSize,
+    
+    // Push gateway metrics
+    IngestTimestamp,
+    IngestBytes,
+    IngestDurationSeconds,
+    IngestSuccess,
+    PushTimestamp,
+    MetricsInitialized,
+}
+
+impl fmt::Display for MetricName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            // Heartbeat
+            MetricName::Heartbeat => "sms_heartbeat_total",
+            
+            // Sources metrics
+            MetricName::SourcesRequestsSuccess => "sms_sources_requests_success_total",
+            MetricName::SourcesRequestsError => "sms_sources_requests_error_total",
+            MetricName::SourcesRequestDuration => "sms_sources_request_duration_seconds",
+            MetricName::SourcesPayloadBytes => "sms_sources_payload_bytes",
+            MetricName::SourcesRegistryLoadsSuccess => "sms_sources_registry_loads_success_total",
+            MetricName::SourcesRegistryLoadsError => "sms_sources_registry_loads_error_total",
+            
+            // Gateway metrics
+            MetricName::GatewayEnvelopesAccepted => "sms_gateway_envelopes_accepted_total",
+            MetricName::GatewayEnvelopesDeduplicated => "sms_gateway_envelopes_deduplicated_total",
+            MetricName::GatewayCasWritesSuccess => "sms_gateway_cas_writes_success_total",
+            MetricName::GatewayCasWritesError => "sms_gateway_cas_writes_error_total",
+            MetricName::GatewayRecordsIngested => "sms_gateway_records_ingested_total",
+            MetricName::GatewayProcessingDuration => "sms_gateway_processing_duration_seconds",
+            MetricName::GatewayIngestSuccess => "sms_gateway_ingest_success_total",
+            MetricName::GatewayIngestError => "sms_gateway_ingest_error_total",
+            MetricName::GatewayBytesIngested => "sms_gateway_bytes_ingested",
+            MetricName::GatewayIngestDuration => "sms_gateway_ingest_duration_seconds",
+            MetricName::GatewayEnvelopeCreated => "sms_gateway_envelope_created",
+            
+            // Ingest log metrics
+            MetricName::IngestLogWritesSuccess => "sms_ingest_log_writes_success_total",
+            MetricName::IngestLogWritesError => "sms_ingest_log_writes_error_total",
+            MetricName::IngestLogWriteBytes => "sms_ingest_log_write_bytes",
+            MetricName::IngestLogRotations => "sms_ingest_log_rotations_total",
+            MetricName::IngestLogCurrentFileBytes => "sms_ingest_log_current_file_bytes",
+            MetricName::IngestLogActiveConsumers => "sms_ingest_log_active_consumers",
+            
+            // Parser metrics
+            MetricName::ParserParseSuccess => "sms_parser_parse_success_total",
+            MetricName::ParserParseError => "sms_parser_parse_error_total",
+            MetricName::ParserDuration => "sms_parser_duration_seconds",
+            MetricName::ParserRecordsExtracted => "sms_parser_records_extracted_total",
+            MetricName::ParserBytesProcessed => "sms_parser_bytes_processed",
+            MetricName::ParserBatchSize => "sms_parser_batch_size",
+            
+            // Push gateway metrics
+            MetricName::IngestTimestamp => "sms_ingest_timestamp_ms",
+            MetricName::IngestBytes => "sms_ingest_bytes",
+            MetricName::IngestDurationSeconds => "sms_ingest_duration_seconds",
+            MetricName::IngestSuccess => "sms_ingest_success",
+            MetricName::PushTimestamp => "sms_push_timestamp_ms",
+            MetricName::MetricsInitialized => "sms_metrics_initialized",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+impl MetricName {
+    /// Get the metric name as a string (convenience method)
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            // Heartbeat
+            MetricName::Heartbeat => "sms_heartbeat_total",
+            
+            // Sources metrics
+            MetricName::SourcesRequestsSuccess => "sms_sources_requests_success_total",
+            MetricName::SourcesRequestsError => "sms_sources_requests_error_total",
+            MetricName::SourcesRequestDuration => "sms_sources_request_duration_seconds",
+            MetricName::SourcesPayloadBytes => "sms_sources_payload_bytes",
+            MetricName::SourcesRegistryLoadsSuccess => "sms_sources_registry_loads_success_total",
+            MetricName::SourcesRegistryLoadsError => "sms_sources_registry_loads_error_total",
+            
+            // Gateway metrics
+            MetricName::GatewayEnvelopesAccepted => "sms_gateway_envelopes_accepted_total",
+            MetricName::GatewayEnvelopesDeduplicated => "sms_gateway_envelopes_deduplicated_total",
+            MetricName::GatewayCasWritesSuccess => "sms_gateway_cas_writes_success_total",
+            MetricName::GatewayCasWritesError => "sms_gateway_cas_writes_error_total",
+            MetricName::GatewayRecordsIngested => "sms_gateway_records_ingested_total",
+            MetricName::GatewayProcessingDuration => "sms_gateway_processing_duration_seconds",
+            MetricName::GatewayIngestSuccess => "sms_gateway_ingest_success_total",
+            MetricName::GatewayIngestError => "sms_gateway_ingest_error_total",
+            MetricName::GatewayBytesIngested => "sms_gateway_bytes_ingested",
+            MetricName::GatewayIngestDuration => "sms_gateway_ingest_duration_seconds",
+            MetricName::GatewayEnvelopeCreated => "sms_gateway_envelope_created",
+            
+            // Ingest log metrics
+            MetricName::IngestLogWritesSuccess => "sms_ingest_log_writes_success_total",
+            MetricName::IngestLogWritesError => "sms_ingest_log_writes_error_total",
+            MetricName::IngestLogWriteBytes => "sms_ingest_log_write_bytes",
+            MetricName::IngestLogRotations => "sms_ingest_log_rotations_total",
+            MetricName::IngestLogCurrentFileBytes => "sms_ingest_log_current_file_bytes",
+            MetricName::IngestLogActiveConsumers => "sms_ingest_log_active_consumers",
+            
+            // Parser metrics
+            MetricName::ParserParseSuccess => "sms_parser_parse_success_total",
+            MetricName::ParserParseError => "sms_parser_parse_error_total",
+            MetricName::ParserDuration => "sms_parser_duration_seconds",
+            MetricName::ParserRecordsExtracted => "sms_parser_records_extracted_total",
+            MetricName::ParserBytesProcessed => "sms_parser_bytes_processed",
+            MetricName::ParserBatchSize => "sms_parser_batch_size",
+            
+            // Push gateway metrics
+            MetricName::IngestTimestamp => "sms_ingest_timestamp_ms",
+            MetricName::IngestBytes => "sms_ingest_bytes",
+            MetricName::IngestDurationSeconds => "sms_ingest_duration_seconds",
+            MetricName::IngestSuccess => "sms_ingest_success",
+            MetricName::PushTimestamp => "sms_push_timestamp_ms",
+            MetricName::MetricsInitialized => "sms_metrics_initialized",
+        }
+    }
+
+    /// Convenience method to increment a counter metric
+    pub fn increment_counter(&self) {
+        ::metrics::counter!(self.as_str()).increment(1);
+    }
+
+    /// Convenience method to increment a counter metric by a specific amount
+    pub fn increment_counter_by(&self, value: u64) {
+        ::metrics::counter!(self.as_str()).increment(value);
+    }
+
+    /// Convenience method to record a histogram value
+    pub fn record_histogram(&self, value: f64) {
+        ::metrics::histogram!(self.as_str()).record(value);
+    }
+
+    /// Convenience method to set a gauge value
+    pub fn set_gauge(&self, value: f64) {
+        ::metrics::gauge!(self.as_str()).set(value);
+    }
+
+    /// Convenience method for counter with one label
+    pub fn increment_counter_with_label(&self, key: &'static str, value: String) {
+        ::metrics::counter!(self.as_str(), key => value).increment(1);
+    }
+
+    /// Convenience method for histogram with one label
+    pub fn record_histogram_with_label(&self, hist_value: f64, key: &'static str, value: String) {
+        ::metrics::histogram!(self.as_str(), key => value).record(hist_value);
+    }
+
+    /// Get all metric names as an iterator (for dynamic dashboard generation)
+    pub fn all_metrics() -> impl Iterator<Item = MetricName> {
+        use MetricName::*;
+        [
+            // Heartbeat
+            Heartbeat,
+            
+            // Sources metrics
+            SourcesRequestsSuccess,
+            SourcesRequestsError,
+            SourcesRequestDuration,
+            SourcesPayloadBytes,
+            SourcesRegistryLoadsSuccess,
+            SourcesRegistryLoadsError,
+            
+            // Gateway metrics
+            GatewayEnvelopesAccepted,
+            GatewayEnvelopesDeduplicated,
+            GatewayCasWritesSuccess,
+            GatewayCasWritesError,
+            GatewayRecordsIngested,
+            GatewayProcessingDuration,
+            GatewayIngestSuccess,
+            GatewayIngestError,
+            GatewayBytesIngested,
+            GatewayIngestDuration,
+            GatewayEnvelopeCreated,
+            
+            // Ingest log metrics
+            IngestLogWritesSuccess,
+            IngestLogWritesError,
+            IngestLogWriteBytes,
+            IngestLogRotations,
+            IngestLogCurrentFileBytes,
+            IngestLogActiveConsumers,
+            
+            // Parser metrics
+            ParserParseSuccess,
+            ParserParseError,
+            ParserDuration,
+            ParserRecordsExtracted,
+            ParserBytesProcessed,
+            ParserBatchSize,
+            
+            // Push gateway metrics (usually not displayed)
+            // IngestTimestamp,
+            // IngestBytes,
+            // IngestDurationSeconds,
+            // IngestSuccess,
+            // PushTimestamp,
+            // MetricsInitialized,
+        ].into_iter()
+    }
+
+    /// Get metric metadata for dashboard generation
+    pub fn metadata(&self) -> (&'static str, &'static str, Option<&'static str>) {
+        // Returns (phase, description, unit)
+        match self {
+            // Heartbeat
+            MetricName::Heartbeat => ("system", "Heartbeat counter", None),
+            
+            // Sources metrics
+            MetricName::SourcesRequestsSuccess => ("sources", "Total successful source requests", None),
+            MetricName::SourcesRequestsError => ("sources", "Total failed source requests", None),
+            MetricName::SourcesRequestDuration => ("sources", "Request duration in seconds", Some("s")),
+            MetricName::SourcesPayloadBytes => ("sources", "Payload size in bytes", Some("bytes")),
+            MetricName::SourcesRegistryLoadsSuccess => ("sources", "Successful registry loads", None),
+            MetricName::SourcesRegistryLoadsError => ("sources", "Failed registry loads", None),
+            
+            // Gateway metrics
+            MetricName::GatewayEnvelopesAccepted => ("gateway", "Total envelopes accepted", None),
+            MetricName::GatewayEnvelopesDeduplicated => ("gateway", "Total envelopes deduplicated", None),
+            MetricName::GatewayCasWritesSuccess => ("gateway", "Successful CAS writes", None),
+            MetricName::GatewayCasWritesError => ("gateway", "Failed CAS writes", None),
+            MetricName::GatewayRecordsIngested => ("gateway", "Total records ingested", None),
+            MetricName::GatewayProcessingDuration => ("gateway", "Gateway processing duration", Some("s")),
+            MetricName::GatewayIngestSuccess => ("gateway", "Successful ingests by source", None),
+            MetricName::GatewayIngestError => ("gateway", "Failed ingests by source", None),
+            MetricName::GatewayBytesIngested => ("gateway", "Bytes ingested per source", Some("bytes")),
+            MetricName::GatewayIngestDuration => ("gateway", "Ingest duration by source", Some("s")),
+            MetricName::GatewayEnvelopeCreated => ("gateway", "Envelopes created", None),
+            
+            // Ingest log metrics
+            MetricName::IngestLogWritesSuccess => ("ingest_log", "Successful log writes", None),
+            MetricName::IngestLogWritesError => ("ingest_log", "Failed log writes", None),
+            MetricName::IngestLogWriteBytes => ("ingest_log", "Log write size", Some("bytes")),
+            MetricName::IngestLogRotations => ("ingest_log", "Log rotations", None),
+            MetricName::IngestLogCurrentFileBytes => ("ingest_log", "Current log file size", Some("bytes")),
+            MetricName::IngestLogActiveConsumers => ("ingest_log", "Active log consumers", None),
+            
+            // Parser metrics
+            MetricName::ParserParseSuccess => ("parser", "Successful parses", None),
+            MetricName::ParserParseError => ("parser", "Parse errors", None),
+            MetricName::ParserDuration => ("parser", "Parse duration", Some("s")),
+            MetricName::ParserRecordsExtracted => ("parser", "Records extracted", None),
+            MetricName::ParserBytesProcessed => ("parser", "Bytes processed", Some("bytes")),
+            MetricName::ParserBatchSize => ("parser", "Parse batch size", None),
+            
+            // Push gateway metrics
+            MetricName::IngestTimestamp => ("pushgateway", "Last ingest timestamp", Some("ms")),
+            MetricName::IngestBytes => ("pushgateway", "Ingest bytes", Some("bytes")),
+            MetricName::IngestDurationSeconds => ("pushgateway", "Ingest duration", Some("s")),
+            MetricName::IngestSuccess => ("pushgateway", "Ingest success flag", None),
+            MetricName::PushTimestamp => ("pushgateway", "Push timestamp", Some("ms")),
+            MetricName::MetricsInitialized => ("pushgateway", "Metrics initialized flag", None),
+        }
+    }
+
+    /// Infer metric type from metric name patterns
+    pub fn infer_metric_type(&self) -> crate::observability::metrics::dashboard::MetricType {
+        use crate::observability::metrics::dashboard::MetricType;
+        let name = self.as_str();
+        
+        if name.contains("_total") || name.contains("success") || name.contains("error") || name.contains("extracted") {
+            MetricType::Counter
+        } else if name.contains("_seconds") || name.contains("_bytes") || name.contains("_duration") || name.contains("_size") {
+            MetricType::Histogram
+        } else if name.contains("current_") || name.contains("active_") || name.contains("initialized") {
+            MetricType::Gauge
+        } else {
+            // Default to counter for unknown patterns
+            MetricType::Counter
+        }
+    }
+}
+
 use tracing::{info, warn};
 use std::sync::Arc;
 
@@ -170,9 +490,10 @@ macro_rules! counter_and_push {
 
 /// Record a heartbeat for testing
 pub fn heartbeat() {
-    ::metrics::counter!("sms_heartbeat_total").increment(1);
-    tokio::spawn(async {
-        let _ = push_single_metric("sms_heartbeat_total", 1.0, "counter").await;
+    let metric_name = MetricName::Heartbeat.as_str();
+    ::metrics::counter!(metric_name).increment(1);
+    tokio::spawn(async move {
+        let _ = push_single_metric(metric_name, 1.0, "counter").await;
     });
 }
 
@@ -181,51 +502,55 @@ pub fn heartbeat() {
 // ============================================================================
 
 pub mod sources {
-    use super::{push_single_metric, push_histogram_metric};
+    use super::{push_single_metric, push_histogram_metric, MetricName};
     
     /// Record a successful request
     pub fn request_success() {
-        ::metrics::counter!("sms_sources_requests_success_total").increment(1);
+        let metric_name = MetricName::SourcesRequestsSuccess.as_str();
+        ::metrics::counter!(metric_name).increment(1);
         // Immediately push this metric
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_sources_requests_success_total", 1.0, "counter").await;
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record a failed request
     pub fn request_error() {
-        ::metrics::counter!("sms_sources_requests_error_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_sources_requests_error_total", 1.0, "counter").await;
+        let metric_name = MetricName::SourcesRequestsError.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record request duration
     pub fn request_duration(secs: f64) {
-        ::metrics::histogram!("sms_sources_request_duration_seconds").record(secs);
+        let metric_name = MetricName::SourcesRequestDuration.as_str();
+        ::metrics::histogram!(metric_name).record(secs);
         tokio::spawn(async move {
-            let _ = push_single_metric("sms_sources_request_duration_seconds", secs, "gauge").await;
+            let _ = push_single_metric(metric_name, secs, "gauge").await;
         });
     }
     
     /// Record payload size
     pub fn payload_bytes(bytes: usize) {
         let b = bytes as f64;
-        ::metrics::histogram!("sms_sources_payload_bytes").record(b);
+        let metric_name = MetricName::SourcesPayloadBytes.as_str();
+        ::metrics::histogram!(metric_name).record(b);
         tokio::spawn(async move {
             // Push histogram with buckets instead of single value
-            let _ = push_histogram_metric("sms_sources_payload_bytes", b).await;
+            let _ = push_histogram_metric(metric_name, b).await;
         });
     }
     
     /// Record successful registry load
     pub fn registry_load_success() {
-        counter_and_push!("sms_sources_registry_loads_success_total");
+        counter_and_push!(MetricName::SourcesRegistryLoadsSuccess.as_str());
     }
     
     /// Record failed registry load
     pub fn registry_load_error() {
-        counter_and_push!("sms_sources_registry_loads_error_total");
+        counter_and_push!(MetricName::SourcesRegistryLoadsError.as_str());
     }
 }
 
@@ -234,66 +559,72 @@ pub mod sources {
 // ============================================================================
 
 pub mod gateway {
-    use super::push_single_metric;
+    use super::{push_single_metric, MetricName};
     
     /// Record an accepted envelope
     pub fn envelope_accepted() {
-        ::metrics::counter!("sms_gateway_envelopes_accepted_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_gateway_envelopes_accepted_total", 1.0, "counter").await;
+        let metric_name = MetricName::GatewayEnvelopesAccepted.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record a deduplicated envelope
     pub fn envelope_deduplicated() {
-        ::metrics::counter!("sms_gateway_envelopes_deduplicated_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_gateway_envelopes_deduplicated_total", 1.0, "counter").await;
+        let metric_name = MetricName::GatewayEnvelopesDeduplicated.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record successful CAS write
     pub fn cas_write_success() {
-        ::metrics::counter!("sms_gateway_cas_writes_success_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_gateway_cas_writes_success_total", 1.0, "counter").await;
+        let metric_name = MetricName::GatewayCasWritesSuccess.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record failed CAS write
     pub fn cas_write_error() {
-        ::metrics::counter!("sms_gateway_cas_writes_error_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_gateway_cas_writes_error_total", 1.0, "counter").await;
+        let metric_name = MetricName::GatewayCasWritesError.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record ingested records
     #[allow(dead_code)]
     pub fn records_ingested(count: u64) {
-        ::metrics::counter!("sms_gateway_records_ingested_total").increment(count);
+        let metric_name = MetricName::GatewayRecordsIngested.as_str();
+        ::metrics::counter!(metric_name).increment(count);
         let c = count as f64;
         tokio::spawn(async move {
-            let _ = push_single_metric("sms_gateway_records_ingested_total", c, "counter").await;
+            let _ = push_single_metric(metric_name, c, "counter").await;
         });
     }
     
     /// Record processing duration
     pub fn processing_duration(secs: f64) {
-        ::metrics::histogram!("sms_gateway_processing_duration_seconds").record(secs);
+        let metric_name = MetricName::GatewayProcessingDuration.as_str();
+        ::metrics::histogram!(metric_name).record(secs);
         tokio::spawn(async move {
-            let _ = push_single_metric("sms_gateway_processing_duration_seconds", secs, "gauge").await;
+            let _ = push_single_metric(metric_name, secs, "gauge").await;
         });
     }
     
     /// Record successful ingest for a source
     pub fn ingest_success(source_id: &str) {
-        ::metrics::counter!("sms_gateway_ingest_success_total", "source_id" => source_id.to_string()).increment(1);
+        ::metrics::counter!(MetricName::GatewayIngestSuccess.as_str(), "source_id" => source_id.to_string()).increment(1);
     }
     
     /// Record failed ingest for a source
     pub fn ingest_error(source_id: &str, error_type: &str) {
-        ::metrics::counter!("sms_gateway_ingest_error_total", 
+        ::metrics::counter!(MetricName::GatewayIngestError.as_str(), 
             "source_id" => source_id.to_string(),
             "error_type" => error_type.to_string()
         ).increment(1);
@@ -301,12 +632,12 @@ pub mod gateway {
     
     /// Record bytes ingested for a source
     pub fn bytes_ingested(source_id: &str, bytes: u64) {
-        ::metrics::histogram!("sms_gateway_bytes_ingested", "source_id" => source_id.to_string()).record(bytes as f64);
+        ::metrics::histogram!(MetricName::GatewayBytesIngested.as_str(), "source_id" => source_id.to_string()).record(bytes as f64);
     }
     
     /// Record ingest duration for a source
     pub fn duration(source_id: &str, secs: f64) {
-        ::metrics::histogram!("sms_gateway_ingest_duration_seconds", "source_id" => source_id.to_string()).record(secs);
+        ::metrics::histogram!(MetricName::GatewayIngestDuration.as_str(), "source_id" => source_id.to_string()).record(secs);
     }
 }
 
@@ -315,48 +646,49 @@ pub mod gateway {
 // ============================================================================
 
 pub mod ingest_log {
-    use super::push_single_metric;
+    use super::{push_single_metric, push_histogram_metric, MetricName};
     
     /// Record successful write
     pub fn write_success() {
-        ::metrics::counter!("sms_ingest_log_writes_success_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_ingest_log_writes_success_total", 1.0, "counter").await;
+        let metric_name = MetricName::IngestLogWritesSuccess.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record failed write
     pub fn write_error() {
-        ::metrics::counter!("sms_ingest_log_writes_error_total").increment(1);
-        tokio::spawn(async {
-            let _ = push_single_metric("sms_ingest_log_writes_error_total", 1.0, "counter").await;
+        let metric_name = MetricName::IngestLogWritesError.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
         });
     }
     
     /// Record write size
     pub fn write_bytes(bytes: usize) {
         let b = bytes as f64;
-        ::metrics::histogram!("sms_ingest_log_write_bytes").record(b);
-        tokio::spawn(async move {
-            let _ = push_single_metric("sms_ingest_log_write_bytes", b, "gauge").await;
-        });
+        let metric_name = MetricName::IngestLogWriteBytes.as_str();
+        ::metrics::histogram!(metric_name).record(b);
+        // Note: Don't push histogram to pushgateway - let Prometheus recorder handle bucket creation
     }
     
     /// Record log rotation
     #[allow(dead_code)]
     pub fn rotation() {
-        ::metrics::counter!("sms_ingest_log_rotations_total").increment(1);
+        ::metrics::counter!(MetricName::IngestLogRotations.as_str()).increment(1);
     }
     
     /// Set current file size
     pub fn current_file_bytes(bytes: u64) {
-        ::metrics::gauge!("sms_ingest_log_current_file_bytes").set(bytes as f64);
+        ::metrics::gauge!(MetricName::IngestLogCurrentFileBytes.as_str()).set(bytes as f64);
     }
     
     /// Set active consumers count
     #[allow(dead_code)]
     pub fn active_consumers(count: usize) {
-        ::metrics::gauge!("sms_ingest_log_active_consumers").set(count as f64);
+        ::metrics::gauge!(MetricName::IngestLogActiveConsumers.as_str()).set(count as f64);
     }
 }
 
@@ -365,35 +697,50 @@ pub mod ingest_log {
 // ============================================================================
 
 pub mod parser {
+    use super::{push_single_metric, MetricName};
+    
     /// Record successful parse
     pub fn parse_success() {
-        ::metrics::counter!("sms_parser_parse_success_total").increment(1);
+        let metric_name = MetricName::ParserParseSuccess.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
     
     /// Record parse error
     pub fn parse_error() {
-        ::metrics::counter!("sms_parser_parse_error_total").increment(1);
+        let metric_name = MetricName::ParserParseError.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
     }
     
     /// Record parse duration
     pub fn duration(secs: f64) {
-        ::metrics::histogram!("sms_parser_duration_seconds").record(secs);
+        ::metrics::histogram!(MetricName::ParserDuration.as_str()).record(secs);
     }
     
     /// Record extracted records
     pub fn records_extracted(count: u64) {
-        ::metrics::counter!("sms_parser_records_extracted_total").increment(count);
+        let metric_name = MetricName::ParserRecordsExtracted.as_str();
+        ::metrics::counter!(metric_name).increment(count);
+        let c = count as f64;
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, c, "counter").await;
+        });
     }
     
     /// Record bytes processed
     #[allow(dead_code)]
     pub fn bytes_processed(bytes: usize) {
-        ::metrics::histogram!("sms_parser_bytes_processed").record(bytes as f64);
+        ::metrics::histogram!(MetricName::ParserBytesProcessed.as_str()).record(bytes as f64);
     }
     
     /// Record batch size
     pub fn batch_size(size: usize) {
-        ::metrics::histogram!("sms_parser_batch_size").record(size as f64);
+        ::metrics::histogram!(MetricName::ParserBatchSize.as_str()).record(size as f64);
     }
 }
 
@@ -415,7 +762,7 @@ pub async fn push_ingest_metrics(
         gateway::ingest_success(source_id);
         gateway::bytes_ingested(source_id, bytes as u64);
         gateway::duration(source_id, duration_secs);
-        ::metrics::counter!("sms_gateway_envelope_created", 
+        ::metrics::counter!(MetricName::GatewayEnvelopeCreated.as_str(), 
             "source_id" => source_id.to_string(), 
             "envelope_id" => envelope_id.to_string()
         ).increment(1);

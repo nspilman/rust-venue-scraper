@@ -303,12 +303,25 @@ pub async fn parse_run(
         let plan = reg.load_parse_plan(&src_id).await.unwrap_or_else(|_| "parse_plan:wix_calendar_v1".to_string());
         info!("parser: parsing envelope_id={} src_id={} plan={} payload_ref={} ", envelope_id, src_id, plan, payload_ref_s);
         let rec_lines = match uc.parse_one(&src_id, &envelope_id, &payload_ref_s).await {
-            Ok(lines) => lines,
-            Err(e) => { warn!("parser: parse_failed envelope_id={} err={}", envelope_id, e); total_empty_records += 1; Vec::new() }
+            Ok(lines) => {
+                crate::observability::metrics::parser::parse_success();
+                lines
+            },
+            Err(e) => { 
+                warn!("parser: parse_failed envelope_id={} err={}", envelope_id, e); 
+                crate::observability::metrics::parser::parse_error();
+                total_empty_records += 1; 
+                Vec::new() 
+            }
         };
         if rec_lines.is_empty() { total_empty_records += 1; }
         for line in rec_lines.iter() { use std::io::Write; writeln!(out, "{}", line)?; }
         total_written += rec_lines.len();
+        
+        // Record gateway metrics for records ingested from this envelope
+        if !rec_lines.is_empty() {
+            crate::observability::metrics::gateway::records_ingested(rec_lines.len() as u64);
+        }
     }
 
     // Record final parsing metrics

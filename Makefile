@@ -61,3 +61,19 @@ clippy: ## Run clippy lints (deny warnings)
 fmt: ## Format code
 	cargo fmt
 
+# Dashboard Generation
+dashboard: ## Generate static dashboard JSON
+	cargo run --bin build-dashboard
+
+dashboard-dynamic: ## Generate dynamic dashboard JSON from MetricName enum
+	cargo run --bin build-dashboard dynamic
+
+dashboard-provision: dashboard-dynamic ## Generate and provision dynamic dashboard to Grafana
+	@echo "📊 Provisioning dynamic dashboard to Grafana..."
+	cp grafana-dashboard-dynamic.json ops/grafana/provisioning/dashboards/
+	@echo "✅ Dashboard provisioned! Grafana will auto-reload in ~30 seconds"
+	@echo "🌐 Access at: http://localhost:3000"
+
+dashboard-update: ## Update dashboard when adding new metrics
+	./scripts/update-dashboard.sh
+
