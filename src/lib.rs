@@ -1,33 +1,19 @@
+// Core modules organized by functionality
 pub mod apis;
-pub mod constants;
+pub mod common;
 #[cfg(feature = "db")]
 pub mod db;
-pub mod error;
+pub mod domain;
 pub mod graphql;
-pub mod logging;
+pub mod observability;
 pub mod pipeline;
 pub mod server;
-pub mod storage;
-pub mod types;
 
-pub mod envelope;
-pub mod gateway;
-pub mod idempotency;
-pub mod ingest_common;
-pub mod ingest_log_reader;
-pub mod ingest_meta;
-pub mod metrics;
-pub mod parser;
-pub mod rate_limiter;
-pub mod registry;
-pub mod tasks;
-
-// New layered boundaries for application and infrastructure
+// Application layer (ports and use cases)
 pub mod app;
+
+// Infrastructure layer (adapters)
 pub mod infra;
- 
- // Domain data shapes shared across layers
- pub mod domain;
- 
- // Non-invasive architecture scaffolding to guide future refactors.
- pub mod architecture;
+
+// Architecture scaffolding for future refactors
+pub mod architecture;

@@ -1,12 +1,12 @@
-use crate::envelope::{
+use crate::pipeline::ingestion::envelope::{
     ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
 };
-use crate::error::{Result, ScraperError};
-use crate::gateway::Gateway;
-use crate::idempotency::compute_idempotency_key;
-use crate::ingest_meta::IngestMeta;
-use crate::rate_limiter::{Limits, RateLimiter};
-use crate::registry::load_source_spec;
+use crate::common::error::{Result, ScraperError};
+use crate::pipeline::ingestion::gateway::Gateway;
+use crate::pipeline::ingestion::idempotency::compute_idempotency_key;
+use crate::pipeline::ingestion::ingest_meta::IngestMeta;
+use crate::pipeline::ingestion::rate_limiter::{Limits, RateLimiter};
+use crate::pipeline::ingestion::registry::load_source_spec;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use std::path::Path;
 use std::time::Instant;
@@ -24,11 +24,11 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
 
     let spec = match load_source_spec(&reg_path) {
         Ok(spec) => {
-            crate::metrics::sources::registry_load_success();
+            crate::observability::metrics::sources::registry_load_success();
             spec
         }
         Err(e) => {
-            crate::metrics::sources::registry_load_error();
+            crate::observability::metrics::sources::registry_load_error();
             return Err(ScraperError::Api {
                 message: format!("Failed to load registry for {}: {}", source_id, e),
             });
@@ -93,11 +93,11 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     // Record metrics
     let dur = fetch_t0.elapsed().as_secs_f64();
     if (200..=299).contains(&status) {
-        crate::metrics::sources::request_success();
-        crate::metrics::sources::request_duration(dur);
-        crate::metrics::sources::payload_bytes(payload.len());
+        crate::observability::metrics::sources::request_success();
+        crate::observability::metrics::sources::request_duration(dur);
+        crate::observability::metrics::sources::payload_bytes(payload.len());
     } else {
-        crate::metrics::sources::request_error();
+        crate::observability::metrics::sources::request_error();
     }
 
     let content_type = headers
@@ -192,7 +192,7 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let gw = Gateway::new(data_root.clone());
     let accept_start = Instant::now();
     let stamped = gw.accept(env, &payload).map_err(|e| {
-        crate::metrics::gateway::cas_write_error();
+        crate::observability::metrics::gateway::cas_write_error();
         ScraperError::Api {
             message: format!("Gateway accept failed: {}", e),
         }
@@ -201,11 +201,11 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let accept_duration = accept_start.elapsed().as_secs_f64();
 
     // Record successful gateway and ingest log metrics
-    crate::metrics::gateway::envelope_accepted();
-    crate::metrics::gateway::processing_duration(accept_duration);
-    crate::metrics::gateway::cas_write_success();
-    crate::metrics::ingest_log::write_success();
-    crate::metrics::ingest_log::write_bytes(payload.len());
+    crate::observability::metrics::gateway::envelope_accepted();
+    crate::observability::metrics::gateway::processing_duration(accept_duration);
+    crate::observability::metrics::gateway::cas_write_success();
+    crate::observability::metrics::ingest_log::write_success();
+    crate::observability::metrics::ingest_log::write_bytes(payload.len());
 
     debug!(
         "Accepted envelope {} with payload {}",

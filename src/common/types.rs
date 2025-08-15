@@ -1,4 +1,4 @@
-use crate::error::Result;
+use super::error::Result;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +54,17 @@ pub trait EventApi: Send + Sync {
     fn should_skip(&self, _raw_data: &RawEventData) -> (bool, String) {
         (false, String::new())
     }
+}
+
+/// Result of processing an API's events
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessingResult {
+    pub api_name: String,
+    pub total_events: usize,
+    pub processed_events: usize,
+    pub skipped_events: usize,
+    pub errors: Vec<String>,
+    pub output_file: String,
 }
 
 // Removed legacy API priority list; registry and feature flags drive execution now.

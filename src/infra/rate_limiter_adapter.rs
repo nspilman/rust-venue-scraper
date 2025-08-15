@@ -1,7 +1,7 @@
 use crate::app::ports::RateLimiterPort;
 use async_trait::async_trait;
 
-pub struct RateLimiterAdapter(pub crate::rate_limiter::RateLimiter);
+pub struct RateLimiterAdapter(pub crate::pipeline::ingestion::rate_limiter::RateLimiter);
 
 #[async_trait]
 impl RateLimiterPort for RateLimiterAdapter {

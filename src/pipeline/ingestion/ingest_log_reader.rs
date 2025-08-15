@@ -1,4 +1,4 @@
-use crate::ingest_meta::IngestMeta;
+use crate::pipeline::ingestion::ingest_meta::IngestMeta;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Seek, SeekFrom};

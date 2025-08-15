@@ -3,7 +3,7 @@
 //! Generates a Grafana dashboard JSON file from our metrics catalog.
 //! This ensures the dashboard stays in sync with the metrics we actually collect.
 
-use sms_scraper::metrics::dashboard::DashboardBuilder;
+use sms_scraper::observability::metrics::dashboard::DashboardBuilder;
 use std::fs;
 use std::path::PathBuf;
 

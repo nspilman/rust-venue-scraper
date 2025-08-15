@@ -48,7 +48,7 @@ impl PayloadStorePort for CasPayloadStore {
             return Ok(b);
         }
         // Local path: resolve via repo's ingest_log_reader helper
-        let reader = crate::ingest_log_reader::IngestLogReader::new(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data"));
+        let reader = crate::pipeline::ingestion::ingest_log_reader::IngestLogReader::new(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data"));
         if let Some(path) = reader.resolve_payload_path(payload_ref) {
             return std::fs::read(path).map_err(|e| e.to_string());
         }

@@ -1,14 +1,14 @@
-use crate::constants::{DARRELLS_TAVERN_API, DARRELLS_TAVERN_VENUE_NAME};
-use crate::error::{Result, ScraperError};
-use crate::ingest_common::fetch_payload_and_log;
-use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
+use crate::common::constants::{DARRELLS_TAVERN_API, DARRELLS_TAVERN_VENUE_NAME};
+use crate::common::error::{Result, ScraperError};
+use crate::pipeline::ingestion::ingest_common::fetch_payload_and_log;
+use crate::common::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use chrono::{Datelike, NaiveDate, NaiveTime};
 use scraper::{Html, Selector};
 use serde_json::Value;
 use tracing::{info, warn};
 
 pub struct DarrellsTavernCrawler {
-    client: reqwest::Client,
+    _client: reqwest::Client, // Prefixed with _ to suppress warning
 }
 
 impl Default for DarrellsTavernCrawler {
@@ -20,7 +20,7 @@ impl Default for DarrellsTavernCrawler {
 impl DarrellsTavernCrawler {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            _client: reqwest::Client::new(),
         }
     }
 

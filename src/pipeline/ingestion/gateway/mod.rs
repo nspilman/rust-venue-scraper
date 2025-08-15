@@ -2,8 +2,8 @@ pub mod cas_fs;
 pub mod cas_supabase;
 pub mod ingest_log;
 
-use crate::envelope::{EnvelopeSubmissionV1, StampedEnvelopeV1};
-use crate::ingest_meta::IngestMeta;
+use crate::pipeline::ingestion::envelope::{EnvelopeSubmissionV1, StampedEnvelopeV1};
+use crate::pipeline::ingestion::ingest_meta::IngestMeta;
 use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;
@@ -36,7 +36,7 @@ impl Gateway {
         let meta = IngestMeta::open_at_root(&self.root)?;
         let idk = env.idempotency_key.clone();
         if let Some(existing_id) = meta.get_envelope_by_idk(&idk)? {
-            crate::metrics::gateway::envelope_deduplicated();
+            crate::observability::metrics::gateway::envelope_deduplicated();
             let accepted_at = Utc::now();
             let envelope_id = Uuid::new_v4().to_string();
             let dup = StampedEnvelopeV1 {
@@ -46,7 +46,7 @@ impl Gateway {
                 payload_ref: String::new(),
                 dedupe_of: Some(existing_id.clone()),
                 envelope: EnvelopeSubmissionV1 {
-                    timing: crate::envelope::TimingMeta {
+                    timing: crate::pipeline::ingestion::envelope::TimingMeta {
                         gateway_received_at: Some(accepted_at),
                         ..env.timing.clone()
                     },
@@ -55,17 +55,17 @@ impl Gateway {
             };
             ingest_log::append_rotating(&self.root.join("ingest_log"), &dup)?;
             let dur = t0.elapsed().as_secs_f64();
-            crate::metrics::gateway::processing_duration(dur);
+            crate::observability::metrics::gateway::processing_duration(dur);
             return Ok(dup);
         }
 
-        let bytes = payload_bytes.len();
-        crate::metrics::gateway::envelope_accepted();
+        let _bytes = payload_bytes.len();
+        crate::observability::metrics::gateway::envelope_accepted();
         let accepted_at = Utc::now();
         let envelope_id = Uuid::new_v4().to_string();
 
         // Write payload to CAS (Supabase if configured, otherwise local FS)
-        let cas_t0 = std::time::Instant::now();
+        let _cas_t0 = std::time::Instant::now();
         let payload_ref = if (std::env::var("SUPABASE_URL").is_ok()
             || std::env::var("SUPABASE_PROJECT_REF").is_ok())
             && std::env::var("SUPABASE_SERVICE_ROLE_KEY").is_ok()
@@ -73,15 +73,15 @@ impl Gateway {
         {
             let result = cas_supabase::write_cas_supabase(payload_bytes);
             match &result {
-                Ok(_) => crate::metrics::gateway::cas_write_success(),
-                Err(_) => crate::metrics::gateway::cas_write_error(),
+                Ok(_) => crate::observability::metrics::gateway::cas_write_success(),
+                Err(_) => crate::observability::metrics::gateway::cas_write_error(),
             }
             result?
         } else {
             let result = cas_fs::write_cas(&self.root.join("cas"), payload_bytes);
             match &result {
-                Ok(_) => crate::metrics::gateway::cas_write_success(),
-                Err(_) => crate::metrics::gateway::cas_write_error(),
+                Ok(_) => crate::observability::metrics::gateway::cas_write_success(),
+                Err(_) => crate::observability::metrics::gateway::cas_write_error(),
             }
             result?
         };
@@ -93,7 +93,7 @@ impl Gateway {
             payload_ref: payload_ref.clone(),
             dedupe_of: None,
             envelope: EnvelopeSubmissionV1 {
-                timing: crate::envelope::TimingMeta {
+                timing: crate::pipeline::ingestion::envelope::TimingMeta {
                     gateway_received_at: Some(accepted_at),
                     ..env.timing.clone()
                 },
@@ -106,7 +106,7 @@ impl Gateway {
         meta.put_dedupe_mapping(&idk, &envelope_id)?;
 
         let dur = t0.elapsed().as_secs_f64();
-        crate::metrics::gateway::processing_duration(dur);
+        crate::observability::metrics::gateway::processing_duration(dur);
         Ok(stamped)
     }
 }

@@ -2,7 +2,7 @@ use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::pipeline::ProcessedEvent;
+use crate::pipeline::pipeline::ProcessedEvent;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Venue {

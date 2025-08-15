@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 /// Represents a metric type for dashboard panel generation
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetricType {
     Counter,
@@ -15,6 +16,7 @@ pub enum MetricType {
 }
 
 /// Represents a metric definition
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MetricDef {
     pub name: String,
@@ -25,6 +27,7 @@ pub struct MetricDef {
 }
 
 /// Dashboard builder for generating Grafana dashboards
+#[allow(dead_code)]
 pub struct DashboardBuilder {
     title: String,
     metrics: Vec<MetricDef>,
@@ -33,6 +36,7 @@ pub struct DashboardBuilder {
 
 impl DashboardBuilder {
     /// Create a new dashboard builder
+    #[allow(dead_code)]
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             title: title.into(),
@@ -42,18 +46,21 @@ impl DashboardBuilder {
     }
 
     /// Set the datasource name
+    #[allow(dead_code)]
     pub fn with_datasource(mut self, datasource: impl Into<String>) -> Self {
         self.datasource = datasource.into();
         self
     }
 
     /// Add a metric definition
+    #[allow(dead_code)]
     pub fn add_metric(mut self, metric: MetricDef) -> Self {
         self.metrics.push(metric);
         self
     }
 
     /// Create from our metrics catalog
+    #[allow(dead_code)]
     pub fn from_catalog() -> Self {
         let mut builder = Self::new("SMS Scraper Metrics Dashboard");
         
@@ -341,6 +348,7 @@ impl DashboardBuilder {
     }
 
     /// Build the complete Grafana dashboard JSON
+    #[allow(dead_code)]
     pub fn build(&self) -> Value {
         let mut panels = Vec::new();
         let mut panel_id = 1;

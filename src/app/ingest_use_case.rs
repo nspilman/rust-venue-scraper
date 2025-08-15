@@ -1,5 +1,5 @@
 use crate::app::ports::{CadencePort, GatewayPort, HttpClientPort, RateLimiterPort};
-use crate::envelope::{ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta};
+use crate::pipeline::ingestion::envelope::{ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta};
 
 pub struct IngestUseCase<R: RateLimiterPort + ?Sized, C: CadencePort + ?Sized, H: HttpClientPort + ?Sized, G: GatewayPort + ?Sized> {
     pub rate: Box<R>,

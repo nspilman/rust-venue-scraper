@@ -1,7 +1,8 @@
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Start a temporary HTTP server to collect metrics and push them to the gateway
+#[allow(dead_code)]
 pub async fn collect_and_push_metrics(instance: &str) -> Result<(), Box<dyn std::error::Error>> {
     let pushgateway_url = std::env::var("SMS_PUSHGATEWAY_URL")
         .unwrap_or_else(|_| "http://localhost:9091".to_string());
@@ -62,15 +63,13 @@ pub async fn collect_and_push_metrics(instance: &str) -> Result<(), Box<dyn std:
     Ok(())
 }
 
+#[allow(dead_code)]
 async fn handle_metrics_request(mut stream: tokio::net::TcpStream) {
     use tokio::io::AsyncWriteExt;
     
     // Get metrics from the global registry
-    let metrics = if let Some(handle) = crate::metrics::get_handle() {
-        handle.render()
-    } else {
-        String::new()
-    };
+    let metrics = crate::observability::metrics::get_metrics_handle()
+        .unwrap_or_else(|| String::new());
     
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: {}\r\n\r\n{}",

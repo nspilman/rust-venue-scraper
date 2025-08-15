@@ -1,13 +1,13 @@
-use crate::constants::{SEA_MONSTER_API, SEA_MONSTER_VENUE_NAME};
-use crate::error::{Result, ScraperError};
-use crate::ingest_common::fetch_payload_and_log;
-use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
+use crate::common::constants::{SEA_MONSTER_API, SEA_MONSTER_VENUE_NAME};
+use crate::common::error::{Result, ScraperError};
+use crate::pipeline::ingestion::ingest_common::fetch_payload_and_log;
+use crate::common::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use scraper::{Html, Selector};
 use serde_json::Value;
 use tracing::{debug, error, info, instrument};
 
 pub struct SeaMonsterCrawler {
-    client: reqwest::Client,
+    _client: reqwest::Client, // Prefixed with _ to suppress warning
 }
 
 impl Default for SeaMonsterCrawler {
@@ -19,7 +19,7 @@ impl Default for SeaMonsterCrawler {
 impl SeaMonsterCrawler {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            _client: reqwest::Client::new(),
         }
     }
 }

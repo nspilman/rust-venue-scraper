@@ -1,7 +1,7 @@
 use crate::domain::RawData;
-use crate::error::Result;
-use crate::storage::Storage;
-use crate::types::{EventApi, EventArgs, RawDataInfo};
+use crate::common::error::Result;
+use crate::pipeline::storage::Storage;
+use crate::common::types::{EventApi, EventArgs, RawDataInfo};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -32,16 +32,7 @@ pub struct PipelineResult {
 pub struct Pipeline;
 
 impl Pipeline {
-    async fn push_pushgateway_metrics(
-        _api: &str,
-        _processed: usize,
-        _skipped: usize,
-        _errors: usize,
-        _duration_secs: f64,
-    ) {
-        // Deprecated: kept for compatibility; use metrics::push_all_to_pushgateway instead
-        return;
-    }
+    // Removed unused push_pushgateway_metrics function
     /// Process a single raw event into a ProcessedEvent
     #[instrument(skip(api, raw_event), fields(api_name = %api.api_name()))]
     fn process_event(
@@ -81,7 +72,7 @@ impl Pipeline {
         info!("🚀 Starting pipeline with storage for {}", api_name);
         println!("🚀 Starting pipeline for {}", api_name);
         // metrics: count pipeline runs
-        crate::metrics::sources::registry_load_success();
+        crate::observability::metrics::sources::registry_load_success();
         let t_pipeline = std::time::Instant::now();
 
         // Step 1: Fetch raw events
@@ -90,11 +81,11 @@ impl Pipeline {
         let t_fetch = std::time::Instant::now();
         let raw_events = api.get_event_list().await?;
         let fetch_secs = t_fetch.elapsed().as_secs_f64();
-        crate::metrics::sources::request_duration(fetch_secs);
+        crate::observability::metrics::sources::request_duration(fetch_secs);
         info!("✅ Fetched {} raw events", raw_events.len());
         println!("✅ Fetched {} raw events", raw_events.len());
         // Record payload size through Sources metrics
-        crate::metrics::sources::request_success();
+        crate::observability::metrics::sources::request_success();
 
         // Step 2: Process events
         info!("🔧 Processing events...");
@@ -136,10 +127,10 @@ impl Pipeline {
             errors.len()
         );
         // metrics: counts
-        crate::metrics::parser::parse_success();
-        crate::metrics::parser::records_extracted(processed_events.len() as u64);
+        crate::observability::metrics::parser::parse_success();
+        crate::observability::metrics::parser::records_extracted(processed_events.len() as u64);
         if errors.len() > 0 {
-            crate::metrics::parser::parse_error();
+            crate::observability::metrics::parser::parse_error();
         }
 
         // Step 3: Save raw data to storage
@@ -147,7 +138,7 @@ impl Pipeline {
         for processed_event in &processed_events {
             let mut raw_data = RawData::from_processed_event(processed_event);
             // Map API names to the internal storage format
-            raw_data.api_name = crate::constants::api_name_to_internal(&raw_data.api_name);
+            raw_data.api_name = crate::common::constants::api_name_to_internal(&raw_data.api_name);
             if let Err(e) = storage.create_raw_data(&mut raw_data).await {
                 warn!("Failed to save raw data to storage: {}", e);
             }
@@ -160,10 +151,10 @@ impl Pipeline {
 
         // metrics: total pipeline duration
         let total_secs = t_pipeline.elapsed().as_secs_f64();
-        crate::metrics::parser::duration(total_secs);
+        crate::observability::metrics::parser::duration(total_secs);
 
         // Ensure snapshot is non-empty at push time
-        crate::metrics::heartbeat();
+        crate::observability::heartbeat();
 
         Ok(PipelineResult {
             api_name,

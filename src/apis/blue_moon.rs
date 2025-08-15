@@ -1,12 +1,12 @@
-use crate::constants::{BLUE_MOON_API, BLUE_MOON_VENUE_NAME};
-use crate::error::{Result, ScraperError};
-use crate::ingest_common::fetch_payload_and_log;
-use crate::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
+use crate::common::constants::{BLUE_MOON_API, BLUE_MOON_VENUE_NAME};
+use crate::common::error::{Result, ScraperError};
+use crate::pipeline::ingestion::ingest_common::fetch_payload_and_log;
+use crate::common::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use serde_json::Value;
 use tracing::{debug, info, instrument};
 
 pub struct BlueMoonCrawler {
-    client: reqwest::Client,
+    _client: reqwest::Client, // Prefixed with _ to suppress warning
 }
 
 impl Default for BlueMoonCrawler {
@@ -18,7 +18,7 @@ impl Default for BlueMoonCrawler {
 impl BlueMoonCrawler {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            _client: reqwest::Client::new(),
         }
     }
 }
@@ -36,7 +36,7 @@ impl EventApi for BlueMoonCrawler {
 
         let data: Value = serde_json::from_slice(&payload)?;
         let events_by_date = data["eventsByDates"].as_object().ok_or_else(|| {
-            crate::error::ScraperError::MissingField("eventsByDates not found".into())
+            ScraperError::MissingField("eventsByDates not found".into())
         })?;
 
         let mut all_events = Vec::new();

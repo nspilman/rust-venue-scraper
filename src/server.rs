@@ -1,5 +1,5 @@
-use crate::storage::Storage;
-use crate::tasks::{
+use crate::pipeline::storage::Storage;
+use crate::pipeline::tasks::{
     gateway_once, parse_run, GatewayOnceParams, GatewayOnceResult, ParseParams, ParseResultSummary,
 };
 use axum::{

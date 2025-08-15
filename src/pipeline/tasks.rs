@@ -1,14 +1,13 @@
-use crate::constants;
-use crate::envelope::{
+use crate::common::constants;
+use crate::pipeline::ingestion::envelope::{
     ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
 };
-use crate::gateway::Gateway;
-use crate::idempotency::compute_idempotency_key;
-use crate::ingest_log_reader::IngestLogReader;
-use crate::ingest_meta::IngestMeta;
-use crate::rate_limiter::{Limits, RateLimiter};
-use crate::registry::load_source_spec;
-use crate::storage::Storage;
+use crate::pipeline::ingestion::gateway::Gateway;
+use crate::pipeline::ingestion::idempotency::compute_idempotency_key;
+use crate::pipeline::ingestion::ingest_meta::IngestMeta;
+use crate::pipeline::ingestion::rate_limiter::{Limits, RateLimiter};
+use crate::pipeline::ingestion::registry::load_source_spec;
+use crate::pipeline::storage::Storage;
 use chrono::Utc;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, ETAG, LAST_MODIFIED};
 use serde::{Deserialize, Serialize};
@@ -57,11 +56,11 @@ pub async fn gateway_once(
         .join(format!("{}.json", source));
     let spec = match load_source_spec(&reg_path) {
         Ok(spec) => {
-            crate::metrics::sources::registry_load_success();
+            crate::observability::metrics::sources::registry_load_success();
             spec
         }
         Err(e) => {
-            crate::metrics::sources::registry_load_error();
+            crate::observability::metrics::sources::registry_load_error();
             return Err(format!("Failed to load registry: {e}").into());
         }
     };
@@ -103,11 +102,11 @@ pub async fn gateway_once(
 
     let dur = t0.elapsed().as_secs_f64();
     if (200..=299).contains(&status) {
-        crate::metrics::sources::request_success();
-        crate::metrics::sources::request_duration(dur);
-        crate::metrics::sources::payload_bytes(bytes.len());
+        crate::observability::metrics::sources::request_success();
+        crate::observability::metrics::sources::request_duration(dur);
+        crate::observability::metrics::sources::payload_bytes(bytes.len());
     } else {
-        crate::metrics::sources::request_error();
+        crate::observability::metrics::sources::request_error();
     }
 
     let content_type = headers
@@ -233,7 +232,7 @@ pub async fn parse_run(
     _storage: Arc<dyn Storage>,
     params: ParseParams,
 ) -> Result<ParseResultSummary, Box<dyn std::error::Error>> {
-    use crate::ingest_log_reader::IngestLogReader;
+    use crate::pipeline::ingestion::ingest_log_reader::IngestLogReader;
     use crate::app::parse_use_case::ParseUseCase;
     use crate::infra::{payload_store::CasPayloadStore, registry_adapter::JsonRegistry, parser_factory::DefaultParserFactory};
 
@@ -245,7 +244,7 @@ pub async fn parse_run(
     let reader = IngestLogReader::new(data_root_path_from_arg(&data_root_s));
     let (lines, _last) = reader.read_next(&consumer, max)?;
     info!("parser: read {} log lines from ingest log", lines.len());
-    crate::metrics::parser::batch_size(lines.len());
+    crate::observability::metrics::parser::batch_size(lines.len());
     if lines.is_empty() {
         return Ok(ParseResultSummary { seen: 0, filtered_out: 0, empty_record_envelopes: 0, written_records: 0, output_file: "".to_string() });
     }
@@ -313,7 +312,7 @@ pub async fn parse_run(
     }
 
     // Record final parsing metrics
-    crate::metrics::parser::records_extracted(total_written as u64);
+    crate::observability::metrics::parser::records_extracted(total_written as u64);
 
     Ok(ParseResultSummary { seen: total_seen, filtered_out: total_filtered, empty_record_envelopes: total_empty_records, written_records: total_written, output_file: prefixed_path.to_string_lossy().to_string() })
 }

@@ -1,10 +1,11 @@
-use crate::envelope::StampedEnvelopeV1;
+use crate::pipeline::ingestion::envelope::StampedEnvelopeV1;
 use chrono::Utc;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
 /// Backward-compatible append to a fixed path (no rotation)
+#[allow(dead_code)]
 pub fn append(path: &Path, stamped: &StampedEnvelopeV1) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -38,18 +39,18 @@ pub fn append_rotating(log_dir: &Path, stamped: &StampedEnvelopeV1) -> anyhow::R
     let line = serde_json::to_string(stamped)?;
     match writeln!(file, "{}", line) {
         Ok(_) => {
-            crate::metrics::ingest_log::write_success();
-            crate::metrics::ingest_log::write_bytes(line.len());
+            crate::observability::metrics::ingest_log::write_success();
+            crate::observability::metrics::ingest_log::write_bytes(line.len());
         }
         Err(e) => {
-            crate::metrics::ingest_log::write_error();
+            crate::observability::metrics::ingest_log::write_error();
             return Err(e.into());
         }
     }
 
     // Update current file size
     if let Ok(metadata) = file.metadata() {
-        crate::metrics::ingest_log::current_file_bytes(metadata.len());
+        crate::observability::metrics::ingest_log::current_file_bytes(metadata.len());
     }
 
     Ok(())

@@ -1,5 +1,5 @@
 use crate::graphql::resolvers::Query;
-use crate::storage::Storage;
+use crate::pipeline::storage::Storage;
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use std::sync::Arc;
 

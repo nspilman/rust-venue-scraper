@@ -50,6 +50,12 @@ pub fn init_with_push_options(
 use std::sync::OnceLock;
 static METRICS_HANDLE: OnceLock<Arc<MetricsState>> = OnceLock::new();
 
+/// Get access to the metrics handle for rendering
+#[allow(dead_code)]
+pub fn get_metrics_handle() -> Option<String> {
+    METRICS_HANDLE.get().map(|state| state.handle.render())
+}
+
 struct MetricsState {
     handle: metrics_exporter_prometheus::PrometheusHandle,
     pushgateway_url: String,
@@ -160,27 +166,7 @@ macro_rules! counter_and_push {
     }};
 }
 
-macro_rules! gauge_and_push {
-    ($name:expr, $value:expr) => {{
-        let v = $value as f64;
-        ::metrics::gauge!($name).set(v);
-        let name = $name.to_string();
-        tokio::spawn(async move {
-            let _ = push_single_metric(&name, v, "gauge").await;
-        });
-    }};
-}
-
-macro_rules! histogram_and_push {
-    ($name:expr, $value:expr) => {{
-        let v = $value as f64;
-        ::metrics::histogram!($name).record(v);
-        let name = $name.to_string();
-        tokio::spawn(async move {
-            let _ = push_single_metric(&name, v, "gauge").await;
-        });
-    }};
-}
+// Removed unused macros gauge_and_push and histogram_and_push
 
 /// Record a heartbeat for testing
 pub fn heartbeat() {
@@ -283,6 +269,7 @@ pub mod gateway {
     }
     
     /// Record ingested records
+    #[allow(dead_code)]
     pub fn records_ingested(count: u64) {
         ::metrics::counter!("sms_gateway_records_ingested_total").increment(count);
         let c = count as f64;
@@ -356,6 +343,7 @@ pub mod ingest_log {
     }
     
     /// Record log rotation
+    #[allow(dead_code)]
     pub fn rotation() {
         ::metrics::counter!("sms_ingest_log_rotations_total").increment(1);
     }
@@ -366,6 +354,7 @@ pub mod ingest_log {
     }
     
     /// Set active consumers count
+    #[allow(dead_code)]
     pub fn active_consumers(count: usize) {
         ::metrics::gauge!("sms_ingest_log_active_consumers").set(count as f64);
     }
@@ -397,6 +386,7 @@ pub mod parser {
     }
     
     /// Record bytes processed
+    #[allow(dead_code)]
     pub fn bytes_processed(bytes: usize) {
         ::metrics::histogram!("sms_parser_bytes_processed").record(bytes as f64);
     }
@@ -412,6 +402,7 @@ pub mod parser {
 // ============================================================================
 
 /// Push ingest metrics - wrapper for compatibility with existing code
+#[allow(dead_code)]
 pub async fn push_ingest_metrics(
     source_id: &str,
     bytes: usize,
@@ -439,6 +430,7 @@ pub async fn push_ingest_metrics(
 }
 
 /// Push metrics to Pushgateway
+#[allow(dead_code)]
 pub async fn push_to_pushgateway(
     instance: &str,
     bytes: usize,

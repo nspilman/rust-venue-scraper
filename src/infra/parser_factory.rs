@@ -1,5 +1,5 @@
 use crate::app::ports::{ParserFactory, ParserPort};
-use crate::parser::Parser;
+use crate::pipeline::parser::Parser;
 use async_trait::async_trait;
 
 pub struct DefaultParserFactory;
@@ -22,7 +22,7 @@ struct DarrellsHtmlAdapter;
 #[async_trait]
 impl ParserPort for WixCalendarAdapter {
     async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
-        let p = crate::parser::WixCalendarV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
+        let p = crate::pipeline::parser::WixCalendarV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
         let recs = p.parse(bytes).map_err(|e| e.to_string())?;
         recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
     }
@@ -31,7 +31,7 @@ impl ParserPort for WixCalendarAdapter {
 #[async_trait]
 impl ParserPort for WixWarmupAdapter {
     async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
-        let p = crate::parser::WixWarmupV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
+        let p = crate::pipeline::parser::WixWarmupV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
         let recs = p.parse(bytes).map_err(|e| e.to_string())?;
         recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
     }
@@ -40,7 +40,7 @@ impl ParserPort for WixWarmupAdapter {
 #[async_trait]
 impl ParserPort for DarrellsHtmlAdapter {
     async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
-        let p = crate::parser::DarrellsHtmlV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
+        let p = crate::pipeline::parser::DarrellsHtmlV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
         let recs = p.parse(bytes).map_err(|e| e.to_string())?;
         recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
     }
