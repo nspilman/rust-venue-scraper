@@ -218,6 +218,7 @@ pub struct ParseParams {
     pub output: Option<String>,
     pub source_id: Option<String>,
     pub normalize: Option<bool>,
+    pub quality_gate: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -242,6 +243,11 @@ pub async fn parse_run(
     let data_root_s = params.data_root.unwrap_or_else(|| "data".to_string());
     let output = params.output.unwrap_or_else(|| "parsed.ndjson".to_string());
 
+    // Validation: quality gate requires normalization to be enabled
+    if params.quality_gate.unwrap_or(false) && !params.normalize.unwrap_or(false) {
+        return Err("Quality gate requires normalization to be enabled. Use both --normalize and --quality-gate flags.".into());
+    }
+
     let reader = IngestLogReader::new(data_root_path_from_arg(&data_root_s));
     let (lines, _last) = reader.read_next(&consumer, max)?;
     info!("parser: read {} log lines from ingest log", lines.len());
@@ -252,10 +258,10 @@ pub async fn parse_run(
 
     let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let base_out = Path::new(&output);
-    let dir = base_out.parent().unwrap_or(Path::new("."));
-    std::fs::create_dir_all(dir)?;
+    let output_dir = Path::new("output");
+    std::fs::create_dir_all(output_dir)?;
     let file = base_out.file_name().unwrap_or_else(|| std::ffi::OsStr::new("parsed.ndjson"));
-    let prefixed_path = dir.join(format!("{}_{}", ts, file.to_string_lossy()));
+    let prefixed_path = output_dir.join(format!("{}_{}", ts, file.to_string_lossy()));
     let mut out = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&prefixed_path)?;
 
     // Wire ports and use-cases
@@ -268,10 +274,29 @@ pub async fn parse_run(
         use crate::infra::normalize_output_adapter::FileNormalizeOutputAdapter;
         
         let normalized_output = output.replace(".ndjson", "_normalized.ndjson");
-        let normalized_path = dir.join(format!("{}_{}", ts, Path::new(&normalized_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("normalized.ndjson")).to_string_lossy()));
+        let normalized_path = output_dir.join(format!("{}_{}", ts, Path::new(&normalized_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("normalized.ndjson")).to_string_lossy()));
         let normalize_adapter = FileNormalizeOutputAdapter::new(&normalized_path.to_string_lossy())?;
         
         Some((NormalizeUseCase::new(Box::new(DefaultNormalizer { geocoder: None }), Box::new(normalize_adapter)), normalized_path))
+    } else {
+        None
+    };
+    
+    // Optionally create quality gate use case if quality gate is enabled (requires normalization)
+    let quality_gate_uc = if params.quality_gate.unwrap_or(false) && params.normalize.unwrap_or(false) {
+        use crate::app::quality_gate_use_case::QualityGateUseCase;
+        use crate::infra::quality_gate_output_adapter::FileQualityGateOutputAdapter;
+        
+        let accepted_output = output.replace(".ndjson", "_accepted.ndjson");
+        let quarantined_output = output.replace(".ndjson", "_quarantined.ndjson");
+        
+        let accepted_path = output_dir.join(format!("{}_{}", ts, Path::new(&accepted_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("accepted.ndjson")).to_string_lossy()));
+        let quarantined_path = output_dir.join(format!("{}_{}", ts, Path::new(&quarantined_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("quarantined.ndjson")).to_string_lossy()));
+        
+        let accepted_adapter = FileQualityGateOutputAdapter::new(&accepted_path.to_string_lossy())?;
+        let quarantined_adapter = FileQualityGateOutputAdapter::new(&quarantined_path.to_string_lossy())?;
+        
+        Some((QualityGateUseCase::with_default_quality_gate(Box::new(accepted_adapter), Box::new(quarantined_adapter)), accepted_path, quarantined_path))
     } else {
         None
     };
@@ -337,6 +362,9 @@ pub async fn parse_run(
         for line in rec_lines.iter() { use std::io::Write; writeln!(out, "{}", line)?; }
         total_written += rec_lines.len();
         
+        // Storage for normalized records to pass to quality gate
+        let mut normalized_records: Vec<crate::pipeline::processing::normalize::NormalizedRecord> = Vec::new();
+        
         // Optionally normalize parsed records
         if let Some((ref norm_uc, _)) = normalize_uc {
             if !rec_lines.is_empty() {
@@ -357,12 +385,28 @@ pub async fn parse_run(
                 if !parsed_records.is_empty() {
                     info!("normalize: processing {} parsed records from envelope_id={}", parsed_records.len(), envelope_id);
                     match norm_uc.normalize_batch(&parsed_records).await {
-                        Ok(_) => {
+                        Ok(batch_normalized_records) => {
                             info!("normalize: successfully normalized batch from envelope_id={}", envelope_id);
+                            normalized_records.extend(batch_normalized_records);
                         },
                         Err(e) => {
                             warn!("normalize: failed to normalize batch from envelope_id={}: {}", envelope_id, e);
                         }
+                    }
+                }
+            }
+        }
+        
+        // Optionally run quality gate assessment on normalized records
+        if let Some((ref qg_uc, _, _)) = quality_gate_uc {
+            if !normalized_records.is_empty() {
+                info!("quality_gate: processing {} normalized records from envelope_id={}", normalized_records.len(), envelope_id);
+                match qg_uc.assess_batch(&normalized_records).await {
+                    Ok(assessed_records) => {
+                        info!("quality_gate: successfully assessed {} records from envelope_id={}", assessed_records.len(), envelope_id);
+                    },
+                    Err(e) => {
+                        warn!("quality_gate: failed to assess batch from envelope_id={}: {}", envelope_id, e);
                     }
                 }
             }

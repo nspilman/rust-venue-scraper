@@ -90,6 +90,9 @@ enum Commands {
         /// Also run normalization step after parsing
         #[arg(long)]
         normalize: bool,
+        /// Also run quality gate assessment after normalization (requires --normalize)
+        #[arg(long)]
+        quality_gate: bool,
     },
     /// Run the data ingestion process
     Ingester {
@@ -522,7 +525,7 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
                 }
             }
         }
-        Commands::Parse { consumer, max, data_root, output, source_id, normalize } => {
+        Commands::Parse { consumer, max, data_root, output, source_id, normalize, quality_gate } => {
             // Initialize metrics system
             crate::observability::metrics::init().unwrap_or_else(|e| {
                 eprintln!("Warning: Failed to initialize metrics: {}", e);
@@ -537,6 +540,7 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
                 output: Some(output.clone()),
                 source_id: source_id.clone(),
                 normalize: Some(normalize),
+                quality_gate: Some(quality_gate),
             };
             let storage = std::sync::Arc::new(InMemoryStorage::new()) as std::sync::Arc<dyn Storage>;
             match crate::pipeline::tasks::parse_run(storage, params).await {

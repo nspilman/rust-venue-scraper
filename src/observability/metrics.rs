@@ -59,6 +59,15 @@ pub enum MetricName {
     NormalizeBatchesProcessed,
     NormalizeBatchSize,
     
+    // Quality Gate metrics
+    QualityGateRecordsAccepted,
+    QualityGateRecordsAcceptedWithWarnings,
+    QualityGateRecordsQuarantined,
+    QualityGateQualityScore,
+    QualityGateIssuesDetected,
+    QualityGateBatchesProcessed,
+    QualityGateBatchSize,
+    
 }
 
 impl fmt::Display for MetricName {
@@ -111,6 +120,15 @@ impl fmt::Display for MetricName {
             MetricName::NormalizeWarnings => "sms_normalize_warnings_total",
             MetricName::NormalizeBatchesProcessed => "sms_normalize_batches_processed_total",
             MetricName::NormalizeBatchSize => "sms_normalize_batch_size",
+            
+            // Quality Gate metrics
+            MetricName::QualityGateRecordsAccepted => "sms_quality_gate_records_accepted_total",
+            MetricName::QualityGateRecordsAcceptedWithWarnings => "sms_quality_gate_records_accepted_with_warnings_total",
+            MetricName::QualityGateRecordsQuarantined => "sms_quality_gate_records_quarantined_total",
+            MetricName::QualityGateQualityScore => "sms_quality_gate_quality_score",
+            MetricName::QualityGateIssuesDetected => "sms_quality_gate_issues_detected_total",
+            MetricName::QualityGateBatchesProcessed => "sms_quality_gate_batches_processed_total",
+            MetricName::QualityGateBatchSize => "sms_quality_gate_batch_size",
             
         };
         write!(f, "{}", name)
@@ -169,6 +187,15 @@ impl MetricName {
             MetricName::NormalizeBatchesProcessed => "sms_normalize_batches_processed_total",
             MetricName::NormalizeBatchSize => "sms_normalize_batch_size",
             
+            // Quality Gate metrics
+            MetricName::QualityGateRecordsAccepted => "sms_quality_gate_records_accepted_total",
+            MetricName::QualityGateRecordsAcceptedWithWarnings => "sms_quality_gate_records_accepted_with_warnings_total",
+            MetricName::QualityGateRecordsQuarantined => "sms_quality_gate_records_quarantined_total",
+            MetricName::QualityGateQualityScore => "sms_quality_gate_quality_score",
+            MetricName::QualityGateIssuesDetected => "sms_quality_gate_issues_detected_total",
+            MetricName::QualityGateBatchesProcessed => "sms_quality_gate_batches_processed_total",
+            MetricName::QualityGateBatchSize => "sms_quality_gate_batch_size",
+            
         }
     }
 
@@ -224,6 +251,15 @@ impl MetricName {
             NormalizeWarnings,
             NormalizeBatchesProcessed,
             NormalizeBatchSize,
+
+            // Quality Gate metrics
+            QualityGateRecordsAccepted,
+            QualityGateRecordsAcceptedWithWarnings,
+            QualityGateRecordsQuarantined,
+            QualityGateQualityScore,
+            QualityGateIssuesDetected,
+            QualityGateBatchesProcessed,
+            QualityGateBatchSize,
             
             // Push gateway metrics (usually not displayed)
             // IngestTimestamp,
@@ -287,6 +323,15 @@ impl MetricName {
             MetricName::NormalizeBatchesProcessed => ("normalize", "Batches processed", None),
             MetricName::NormalizeBatchSize => ("normalize", "Normalization batch size", None),
             
+            // Quality Gate metrics
+            MetricName::QualityGateRecordsAccepted => ("quality_gate", "Records accepted by quality gate", None),
+            MetricName::QualityGateRecordsAcceptedWithWarnings => ("quality_gate", "Records accepted with warnings", None),
+            MetricName::QualityGateRecordsQuarantined => ("quality_gate", "Records quarantined by quality gate", None),
+            MetricName::QualityGateQualityScore => ("quality_gate", "Quality score distribution", None),
+            MetricName::QualityGateIssuesDetected => ("quality_gate", "Quality issues detected", None),
+            MetricName::QualityGateBatchesProcessed => ("quality_gate", "Batches processed through quality gate", None),
+            MetricName::QualityGateBatchSize => ("quality_gate", "Quality gate batch size", None),
+            
         }
     }
 
@@ -295,9 +340,9 @@ impl MetricName {
         use crate::observability::metrics::dashboard::MetricType;
         let name = self.as_str();
         
-        if name.contains("_total") || name.contains("success") || name.contains("error") || name.contains("extracted") {
+        if name.contains("_total") || name.contains("success") || name.contains("error") || name.contains("extracted") || name.contains("accepted") || name.contains("quarantined") || name.contains("detected") || name.contains("processed") {
             MetricType::Counter
-        } else if name.contains("_seconds") || name.contains("_bytes") || name.contains("_duration") || name.contains("_size") || name.contains("confidence") {
+        } else if name.contains("_seconds") || name.contains("_bytes") || name.contains("_duration") || name.contains("_size") || name.contains("confidence") || name.contains("score") {
             MetricType::Histogram
         } else if name.contains("current_") || name.contains("active_") || name.contains("initialized") {
             MetricType::Gauge
@@ -779,6 +824,78 @@ pub mod normalize {
         ::metrics::counter!(metric_name).increment(1);
         tokio::spawn(async move {
             let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+}
+
+// ============================================================================
+// Quality Gate Metrics
+// ============================================================================
+
+pub mod quality_gate {
+    use super::{push_single_metric, MetricName};
+    
+    /// Record that a record was accepted by the quality gate
+    pub fn record_accepted() {
+        let metric_name = MetricName::QualityGateRecordsAccepted.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a record was accepted with warnings by the quality gate
+    pub fn record_accepted_with_warnings() {
+        let metric_name = MetricName::QualityGateRecordsAcceptedWithWarnings.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a record was quarantined by the quality gate
+    pub fn record_quarantined() {
+        let metric_name = MetricName::QualityGateRecordsQuarantined.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record the quality score of an assessed record
+    pub fn quality_score_recorded(score: f64) {
+        let metric_name = MetricName::QualityGateQualityScore.as_str();
+        ::metrics::histogram!(metric_name).record(score);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
+    }
+    
+    /// Record that a quality issue was detected
+    pub fn issue_detected(issue_type: &str, severity: &str) {
+        let metric_name = MetricName::QualityGateIssuesDetected.as_str();
+        ::metrics::counter!(metric_name, 
+            "issue_type" => issue_type.to_string(),
+            "severity" => severity.to_string()
+        ).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a batch was processed through the quality gate
+    pub fn batch_processed(total_records: usize, accepted_count: usize, quarantined_count: usize) {
+        // Record batch size
+        let metric_name = MetricName::QualityGateBatchSize.as_str();
+        ::metrics::histogram!(metric_name).record(total_records as f64);
+        
+        // Record batch processing
+        let batch_metric = MetricName::QualityGateBatchesProcessed.as_str();
+        ::metrics::counter!(batch_metric, 
+            "accepted" => accepted_count.to_string(),
+            "quarantined" => quarantined_count.to_string()
+        ).increment(1);
+        
+        tokio::spawn(async move {
+            let _ = push_single_metric(batch_metric, 1.0, "counter").await;
         });
     }
 }

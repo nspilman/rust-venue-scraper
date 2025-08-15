@@ -6,4 +6,5 @@ pub mod rate_limiter_adapter;
 pub mod cadence_adapter;
 pub mod gateway_adapter;
 pub mod normalize_output_adapter;
+pub mod quality_gate_output_adapter;
 

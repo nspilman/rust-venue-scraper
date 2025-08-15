@@ -30,14 +30,24 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -48,37 +58,44 @@
       },
       "id": 2,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_envelopes_accepted_total[5m])",
+          "expr": "sms_gateway_envelopes_accepted_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Total envelopes accepted",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -89,37 +106,44 @@
       },
       "id": 3,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_envelopes_deduplicated_total[5m])",
+          "expr": "sms_gateway_envelopes_deduplicated_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Total envelopes deduplicated",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -130,37 +154,44 @@
       },
       "id": 4,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_cas_writes_success_total[5m])",
+          "expr": "sms_gateway_cas_writes_success_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Successful CAS writes",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -171,37 +202,44 @@
       },
       "id": 5,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_cas_writes_error_total[5m])",
+          "expr": "sms_gateway_cas_writes_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Failed CAS writes",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -212,24 +250,21 @@
       },
       "id": 6,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_records_ingested_total[5m])",
+          "expr": "sms_gateway_records_ingested_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Total records ingested",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -286,14 +321,24 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -304,37 +349,44 @@
       },
       "id": 8,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_ingest_success_total[5m])",
+          "expr": "sms_gateway_ingest_success_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Successful ingests by source",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -345,24 +397,21 @@
       },
       "id": 9,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_gateway_ingest_error_total[5m])",
+          "expr": "sms_gateway_ingest_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Failed ingests by source",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -504,7 +553,7 @@
           "refId": "A"
         }
       ],
-      "title": "Envelopes created",
+      "title": "Envelopes created (Rate)",
       "type": "graph"
     },
     {
@@ -523,14 +572,24 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -541,37 +600,44 @@
       },
       "id": 14,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_ingest_log_writes_success_total[5m])",
+          "expr": "sms_ingest_log_writes_success_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Successful log writes",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -582,24 +648,21 @@
       },
       "id": 15,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_ingest_log_writes_error_total[5m])",
+          "expr": "sms_ingest_log_writes_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Failed log writes",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -656,14 +719,24 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -674,24 +747,21 @@
       },
       "id": 17,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_ingest_log_rotations_total[5m])",
+          "expr": "sms_ingest_log_rotations_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Log rotations",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -793,21 +863,31 @@
         "y": 74
       },
       "id": 20,
-      "title": "PARSER Metrics",
+      "title": "NORMALIZE Metrics",
       "type": "row"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -818,24 +898,21 @@
       },
       "id": 21,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_parser_parse_success_total[5m])",
+          "expr": "sms_normalize_records_processed_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
-      "title": "Successful parses",
-      "type": "graph"
+      "title": "Records processed with normalization",
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -848,7 +925,7 @@
             "lineWidth": 1,
             "spanNulls": true
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
@@ -870,13 +947,326 @@
       },
       "targets": [
         {
-          "expr": "rate(sms_parser_parse_error_total[5m])",
+          "expr": "histogram_quantile(0.5, sum(rate(sms_normalize_confidence_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sms_normalize_confidence_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(sms_normalize_confidence_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Normalization confidence level",
+      "type": "graph"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 83
+      },
+      "id": 23,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_normalize_geocoding_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Geocoding operations performed",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 83
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_normalize_warnings_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Normalization warnings",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 91
+      },
+      "id": 25,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_normalize_batches_processed_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Batches processed",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "spanNulls": true
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 91
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(sms_normalize_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sms_normalize_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(sms_normalize_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Normalization batch size",
+      "type": "graph"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "id": 27,
+      "title": "PARSER Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 100
+      },
+      "id": 28,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_parser_parse_success_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Successful parses",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 100
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_parser_parse_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Parse errors",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -896,9 +1286,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 83
+        "y": 108
       },
-      "id": 23,
+      "id": 30,
       "options": {
         "legend": {
           "calcs": [
@@ -933,6 +1323,54 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 108
+      },
+      "id": 31,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_parser_records_extracted_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Records extracted",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 10,
@@ -946,10 +1384,10 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 83
+        "x": 0,
+        "y": 116
       },
-      "id": 24,
+      "id": 32,
       "options": {
         "legend": {
           "calcs": [
@@ -962,63 +1400,12 @@
       },
       "targets": [
         {
-          "expr": "rate(sms_parser_records_extracted_total[5m])",
+          "expr": "rate(sms_parser_bytes_processed[5m])",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
-      "title": "Records extracted",
-      "type": "graph"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
-          },
-          "unit": "bytes"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 91
-      },
-      "id": 25,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum(rate(sms_parser_bytes_processed_bucket[5m])) by (le))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(sms_parser_bytes_processed_bucket[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
-        },
-        {
-          "expr": "histogram_quantile(0.99, sum(rate(sms_parser_bytes_processed_bucket[5m])) by (le))",
-          "legendFormat": "p99",
-          "refId": "C"
-        }
-      ],
-      "title": "Bytes processed",
+      "title": "Bytes processed (Rate)",
       "type": "graph"
     },
     {
@@ -1039,9 +1426,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 91
+        "y": 116
       },
-      "id": 26,
+      "id": 33,
       "options": {
         "legend": {
           "calcs": [
@@ -1078,9 +1465,363 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 99
+        "y": 124
       },
-      "id": 27,
+      "id": 34,
+      "title": "QUALITY_GATE Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 125
+      },
+      "id": 35,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_quality_gate_records_accepted_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Records accepted by quality gate",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 125
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_quality_gate_records_accepted_with_warnings_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Records accepted with warnings",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 133
+      },
+      "id": 37,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_quality_gate_records_quarantined_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Records quarantined by quality gate",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "spanNulls": true
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 133
+      },
+      "id": 38,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(sms_quality_gate_quality_score_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sms_quality_gate_quality_score_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(sms_quality_gate_quality_score_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Quality score distribution",
+      "type": "graph"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 141
+      },
+      "id": 39,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_quality_gate_issues_detected_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Quality issues detected",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 141
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sms_quality_gate_batches_processed_total",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Batches processed through quality gate",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "spanNulls": true
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 149
+      },
+      "id": 41,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(sms_quality_gate_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sms_quality_gate_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(sms_quality_gate_batch_size_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "Quality gate batch size",
+      "type": "graph"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 157
+      },
+      "id": 42,
       "title": "SOURCES Metrics",
       "type": "row"
     },
@@ -1088,83 +1829,97 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 100
+        "y": 158
       },
-      "id": 28,
+      "id": 43,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_sources_requests_success_total[5m])",
+          "expr": "sms_sources_requests_success_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Total successful source requests",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 100
+        "y": 158
       },
-      "id": 29,
+      "id": 44,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_sources_requests_error_total[5m])",
+          "expr": "sms_sources_requests_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Total failed source requests",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
@@ -1184,9 +1939,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 108
+        "y": 166
       },
-      "id": 30,
+      "id": 45,
       "options": {
         "legend": {
           "calcs": [
@@ -1235,9 +1990,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 108
+        "y": 166
       },
-      "id": 31,
+      "id": 46,
       "options": {
         "legend": {
           "calcs": [
@@ -1272,83 +2027,97 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 116
+        "y": 174
       },
-      "id": 32,
+      "id": 47,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_sources_registry_loads_success_total[5m])",
+          "expr": "sms_sources_registry_loads_success_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Successful registry loads",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 116
+        "y": 174
       },
-      "id": 33,
+      "id": 48,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_sources_registry_loads_error_total[5m])",
+          "expr": "sms_sources_registry_loads_error_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Failed registry loads",
-      "type": "graph"
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -1356,9 +2125,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 124
+        "y": 182
       },
-      "id": 34,
+      "id": 49,
       "title": "SYSTEM Metrics",
       "type": "row"
     },
@@ -1366,42 +2135,49 @@
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "spanNulls": true
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
           },
-          "unit": "ops"
+          "unit": "short"
         }
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 125
+        "y": 183
       },
-      "id": 35,
+      "id": 50,
       "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "textMode": "auto"
       },
       "targets": [
         {
-          "expr": "rate(sms_heartbeat_total[5m])",
+          "expr": "sms_heartbeat_total",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],
       "title": "Heartbeat counter",
-      "type": "graph"
+      "type": "stat"
     }
   ],
   "refresh": "10s",

@@ -57,3 +57,8 @@ pub trait NormalizeOutputPort: Send + Sync {
     async fn write_normalized_record(&self, record: &crate::pipeline::processing::normalize::NormalizedRecord) -> anyhow::Result<()>;
 }
 
+#[async_trait]
+pub trait QualityGateOutputPort: Send + Sync {
+    async fn write_quality_assessed_record(&self, record: &crate::pipeline::processing::quality_gate::QualityAssessedRecord) -> anyhow::Result<()>;
+}
+

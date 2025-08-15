@@ -255,6 +255,58 @@ impl DashboardBuilder {
                 phase: "normalize".to_string(),
             });
 
+        // Quality Gate metrics
+        builder = builder
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateRecordsAccepted.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Records accepted by quality gate".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateRecordsAcceptedWithWarnings.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Records accepted with warnings".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateRecordsQuarantined.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Records quarantined by quality gate".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateQualityScore.to_string(),
+                metric_type: MetricType::Histogram,
+                description: "Quality score distribution".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateIssuesDetected.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Quality issues detected".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateBatchesProcessed.to_string(),
+                metric_type: MetricType::Counter,
+                description: "Batches processed through quality gate".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            })
+            .add_metric(MetricDef {
+                name: MetricName::QualityGateBatchSize.to_string(),
+                metric_type: MetricType::Histogram,
+                description: "Quality gate batch size".to_string(),
+                unit: None,
+                phase: "quality_gate".to_string(),
+            });
+
         builder
     }
 
