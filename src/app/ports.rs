@@ -62,3 +62,13 @@ pub trait QualityGateOutputPort: Send + Sync {
     async fn write_quality_assessed_record(&self, record: &crate::pipeline::processing::quality_gate::QualityAssessedRecord) -> anyhow::Result<()>;
 }
 
+#[async_trait]
+pub trait EnrichOutputPort: Send + Sync {
+    async fn write_enriched_record(&self, record: &crate::pipeline::processing::enrich::EnrichedRecord) -> anyhow::Result<()>;
+}
+
+#[async_trait]
+pub trait ConflationOutputPort: Send + Sync {
+    async fn write_conflated_record(&self, record: &crate::pipeline::processing::conflation::ConflatedRecord) -> anyhow::Result<()>;
+}
+

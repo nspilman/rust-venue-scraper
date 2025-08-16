@@ -68,6 +68,38 @@ pub enum MetricName {
     QualityGateBatchesProcessed,
     QualityGateBatchSize,
     
+    // Enrich metrics
+    EnrichRecordsProcessed,
+    EnrichConfidence,
+    EnrichSpatialBinning,
+    EnrichCityTagging,
+    EnrichTagsAdded,
+    EnrichWarnings,
+    EnrichBatchesProcessed,
+    EnrichBatchSize,
+    
+    // Conflation metrics
+    ConflationRecordsProcessed,
+    ConflationRecordsSuccessful,
+    ConflationRecordsFailed,
+    ConflationConfidenceScore,
+    ConflationNewEntities,
+    ConflationMatchedExisting,
+    ConflationUpdatedExisting,
+    ConflationDuplicates,
+    ConflationUncertainResolutions,
+    ConflationWarnings,
+    ConflationPotentialDuplicates,
+    ConflationAlternativeMatches,
+    ConflationOutputFailed,
+    ConflationProcessingDuration,
+    ConflationBatchesProcessed,
+    ConflationBatchesSuccessful,
+    ConflationBatchSize,
+    ConflationBatchProcessingDuration,
+    ConflationBatchRecordsSuccessful,
+    ConflationBatchRecordsFailed,
+    
 }
 
 impl fmt::Display for MetricName {
@@ -129,6 +161,38 @@ impl fmt::Display for MetricName {
             MetricName::QualityGateIssuesDetected => "sms_quality_gate_issues_detected_total",
             MetricName::QualityGateBatchesProcessed => "sms_quality_gate_batches_processed_total",
             MetricName::QualityGateBatchSize => "sms_quality_gate_batch_size",
+            
+            // Enrich metrics
+            MetricName::EnrichRecordsProcessed => "sms_enrich_records_processed_total",
+            MetricName::EnrichConfidence => "sms_enrich_confidence",
+            MetricName::EnrichSpatialBinning => "sms_enrich_spatial_binning_total",
+            MetricName::EnrichCityTagging => "sms_enrich_city_tagging_total",
+            MetricName::EnrichTagsAdded => "sms_enrich_tags_added",
+            MetricName::EnrichWarnings => "sms_enrich_warnings_total",
+            MetricName::EnrichBatchesProcessed => "sms_enrich_batches_processed_total",
+            MetricName::EnrichBatchSize => "sms_enrich_batch_size",
+            
+            // Conflation metrics
+            MetricName::ConflationRecordsProcessed => "sms_conflation_records_processed_total",
+            MetricName::ConflationRecordsSuccessful => "sms_conflation_records_successful_total",
+            MetricName::ConflationRecordsFailed => "sms_conflation_records_failed_total",
+            MetricName::ConflationConfidenceScore => "sms_conflation_confidence_score",
+            MetricName::ConflationNewEntities => "sms_conflation_new_entities_total",
+            MetricName::ConflationMatchedExisting => "sms_conflation_matched_existing_total",
+            MetricName::ConflationUpdatedExisting => "sms_conflation_updated_existing_total",
+            MetricName::ConflationDuplicates => "sms_conflation_duplicates_total",
+            MetricName::ConflationUncertainResolutions => "sms_conflation_uncertain_resolutions_total",
+            MetricName::ConflationWarnings => "sms_conflation_warnings_total",
+            MetricName::ConflationPotentialDuplicates => "sms_conflation_potential_duplicates_total",
+            MetricName::ConflationAlternativeMatches => "sms_conflation_alternative_matches_total",
+            MetricName::ConflationOutputFailed => "sms_conflation_output_failed_total",
+            MetricName::ConflationProcessingDuration => "sms_conflation_processing_duration_seconds",
+            MetricName::ConflationBatchesProcessed => "sms_conflation_batches_processed_total",
+            MetricName::ConflationBatchesSuccessful => "sms_conflation_batches_successful_total",
+            MetricName::ConflationBatchSize => "sms_conflation_batch_size",
+            MetricName::ConflationBatchProcessingDuration => "sms_conflation_batch_processing_duration_seconds",
+            MetricName::ConflationBatchRecordsSuccessful => "sms_conflation_batch_records_successful_total",
+            MetricName::ConflationBatchRecordsFailed => "sms_conflation_batch_records_failed_total",
             
         };
         write!(f, "{}", name)
@@ -196,6 +260,38 @@ impl MetricName {
             MetricName::QualityGateBatchesProcessed => "sms_quality_gate_batches_processed_total",
             MetricName::QualityGateBatchSize => "sms_quality_gate_batch_size",
             
+            // Enrich metrics
+            MetricName::EnrichRecordsProcessed => "sms_enrich_records_processed_total",
+            MetricName::EnrichConfidence => "sms_enrich_confidence",
+            MetricName::EnrichSpatialBinning => "sms_enrich_spatial_binning_total",
+            MetricName::EnrichCityTagging => "sms_enrich_city_tagging_total",
+            MetricName::EnrichTagsAdded => "sms_enrich_tags_added",
+            MetricName::EnrichWarnings => "sms_enrich_warnings_total",
+            MetricName::EnrichBatchesProcessed => "sms_enrich_batches_processed_total",
+            MetricName::EnrichBatchSize => "sms_enrich_batch_size",
+            
+            // Conflation metrics
+            MetricName::ConflationRecordsProcessed => "sms_conflation_records_processed_total",
+            MetricName::ConflationRecordsSuccessful => "sms_conflation_records_successful_total",
+            MetricName::ConflationRecordsFailed => "sms_conflation_records_failed_total",
+            MetricName::ConflationConfidenceScore => "sms_conflation_confidence_score",
+            MetricName::ConflationNewEntities => "sms_conflation_new_entities_total",
+            MetricName::ConflationMatchedExisting => "sms_conflation_matched_existing_total",
+            MetricName::ConflationUpdatedExisting => "sms_conflation_updated_existing_total",
+            MetricName::ConflationDuplicates => "sms_conflation_duplicates_total",
+            MetricName::ConflationUncertainResolutions => "sms_conflation_uncertain_resolutions_total",
+            MetricName::ConflationWarnings => "sms_conflation_warnings_total",
+            MetricName::ConflationPotentialDuplicates => "sms_conflation_potential_duplicates_total",
+            MetricName::ConflationAlternativeMatches => "sms_conflation_alternative_matches_total",
+            MetricName::ConflationOutputFailed => "sms_conflation_output_failed_total",
+            MetricName::ConflationProcessingDuration => "sms_conflation_processing_duration_seconds",
+            MetricName::ConflationBatchesProcessed => "sms_conflation_batches_processed_total",
+            MetricName::ConflationBatchesSuccessful => "sms_conflation_batches_successful_total",
+            MetricName::ConflationBatchSize => "sms_conflation_batch_size",
+            MetricName::ConflationBatchProcessingDuration => "sms_conflation_batch_processing_duration_seconds",
+            MetricName::ConflationBatchRecordsSuccessful => "sms_conflation_batch_records_successful_total",
+            MetricName::ConflationBatchRecordsFailed => "sms_conflation_batch_records_failed_total",
+            
         }
     }
 
@@ -260,6 +356,16 @@ impl MetricName {
             QualityGateIssuesDetected,
             QualityGateBatchesProcessed,
             QualityGateBatchSize,
+            
+            // Enrich metrics
+            EnrichRecordsProcessed,
+            EnrichConfidence,
+            EnrichSpatialBinning,
+            EnrichCityTagging,
+            EnrichTagsAdded,
+            EnrichWarnings,
+            EnrichBatchesProcessed,
+            EnrichBatchSize,
             
             // Push gateway metrics (usually not displayed)
             // IngestTimestamp,
@@ -331,6 +437,16 @@ impl MetricName {
             MetricName::QualityGateIssuesDetected => ("quality_gate", "Quality issues detected", None),
             MetricName::QualityGateBatchesProcessed => ("quality_gate", "Batches processed through quality gate", None),
             MetricName::QualityGateBatchSize => ("quality_gate", "Quality gate batch size", None),
+            
+            // Enrich metrics
+            MetricName::EnrichRecordsProcessed => ("enrich", "Records processed with enrichment", None),
+            MetricName::EnrichConfidence => ("enrich", "Enrichment confidence level", None),
+            MetricName::EnrichSpatialBinning => ("enrich", "Spatial binning operations performed", None),
+            MetricName::EnrichCityTagging => ("enrich", "City tagging operations performed", None),
+            MetricName::EnrichTagsAdded => ("enrich", "Tags added per record", None),
+            MetricName::EnrichWarnings => ("enrich", "Enrichment warnings", None),
+            MetricName::EnrichBatchesProcessed => ("enrich", "Batches processed through enrichment", None),
+            MetricName::EnrichBatchSize => ("enrich", "Enrichment batch size", None),
             
         }
     }
@@ -522,6 +638,31 @@ pub fn heartbeat() {
     ::metrics::counter!(metric_name).increment(1);
     tokio::spawn(async move {
         let _ = push_single_metric(metric_name, 1.0, "counter").await;
+    });
+}
+
+/// Helper function to emit a counter metric
+pub fn emit_counter(metric_name: MetricName, value: f64) {
+    let name = metric_name.as_str();
+    ::metrics::counter!(name).increment(value as u64);
+    tokio::spawn(async move {
+        let _ = push_single_metric(name, value, "counter").await;
+    });
+}
+
+/// Helper function to emit a histogram metric
+pub fn emit_histogram(metric_name: MetricName, value: f64) {
+    let name = metric_name.as_str();
+    ::metrics::histogram!(name).record(value);
+    // Don't push histograms to pushgateway - let Prometheus handle aggregation
+}
+
+/// Helper function to emit a gauge metric
+pub fn emit_gauge(metric_name: MetricName, value: f64) {
+    let name = metric_name.as_str();
+    ::metrics::gauge!(name).set(value);
+    tokio::spawn(async move {
+        let _ = push_single_metric(name, value, "gauge").await;
     });
 }
 
@@ -1056,4 +1197,77 @@ pub async fn push_all_metrics_with_instance(instance: &str) -> Result<(), Box<dy
     
     info!("Successfully pushed metrics to Pushgateway for instance={}", instance);
     Ok(())
+}
+
+// ============================================================================
+// Enrich Metrics
+// ============================================================================
+
+pub mod enrich {
+    use super::{push_single_metric, MetricName};
+    
+    /// Record that a record was enriched with a specific strategy
+    pub fn record_enriched(strategy: &str) {
+        let metric_name = MetricName::EnrichRecordsProcessed.as_str();
+        ::metrics::counter!(metric_name, "strategy" => strategy.to_string()).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record the confidence level of enrichment
+    pub fn confidence_recorded(confidence: f64) {
+        let metric_name = MetricName::EnrichConfidence.as_str();
+        ::metrics::histogram!(metric_name).record(confidence);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
+    }
+    
+    /// Record that spatial binning was performed
+    pub fn spatial_binning_performed() {
+        let metric_name = MetricName::EnrichSpatialBinning.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that city tagging was performed
+    pub fn city_tagging_performed() {
+        let metric_name = MetricName::EnrichCityTagging.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record the number of tags added to a record
+    pub fn tags_added(count: usize) {
+        let metric_name = MetricName::EnrichTagsAdded.as_str();
+        ::metrics::histogram!(metric_name).record(count as f64);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
+    }
+    
+    /// Record a warning during enrichment
+    pub fn warning_logged(warning: &str) {
+        let metric_name = MetricName::EnrichWarnings.as_str();
+        ::metrics::counter!(metric_name, "warning_type" => warning.to_string()).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a batch was processed through enrichment
+    pub fn batch_processed(batch_size: usize) {
+        // Record batch size
+        let metric_name = MetricName::EnrichBatchSize.as_str();
+        ::metrics::histogram!(metric_name).record(batch_size as f64);
+        
+        // Record batch processing
+        let batch_metric = MetricName::EnrichBatchesProcessed.as_str();
+        ::metrics::counter!(batch_metric).increment(1);
+        
+        tokio::spawn(async move {
+            let _ = push_single_metric(batch_metric, 1.0, "counter").await;
+        });
+    }
 }
