@@ -4,7 +4,7 @@ use tracing::{info, warn, error, debug};
 
 use crate::app::ports::ConflationOutputPort;
 use crate::observability::metrics::{emit_counter, emit_histogram, emit_gauge, MetricName};
-use crate::pipeline::processing::conflation::{ConflatedRecord, Conflator, DefaultConflator, EntityId, EntityType, ResolutionDecision};
+use crate::pipeline::processing::conflation::{ConflatedRecord, Conflator, DefaultConflator, ResolutionDecision};
 use crate::pipeline::processing::enrich::EnrichedRecord;
 
 /// Use case for performing entity conflation on enriched records

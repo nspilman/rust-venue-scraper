@@ -3,7 +3,7 @@ use serde_json;
 use std::path::PathBuf;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use tracing::{info, error, debug};
+use tracing::debug;
 
 use crate::app::ports::ConflationOutputPort;
 use crate::pipeline::processing::conflation::ConflatedRecord;
@@ -40,7 +40,7 @@ impl ConflationOutputAdapter {
 
         if self.use_date_partitioning {
             // Create date-based subdirectories: output_dir/year=YYYY/month=MM/day=DD/
-            let conflated_date = record.conflated_at.format("%Y-%m-%d");
+            let _conflated_date = record.conflated_at.format("%Y-%m-%d");
             let year = record.conflated_at.format("%Y");
             let month = record.conflated_at.format("%m");
             let day = record.conflated_at.format("%d");

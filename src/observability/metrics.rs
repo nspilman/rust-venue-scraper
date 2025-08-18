@@ -448,6 +448,28 @@ impl MetricName {
             MetricName::EnrichBatchesProcessed => ("enrich", "Batches processed through enrichment", None),
             MetricName::EnrichBatchSize => ("enrich", "Enrichment batch size", None),
             
+            // Conflation metrics
+            MetricName::ConflationRecordsProcessed => ("conflation", "Records processed through conflation", None),
+            MetricName::ConflationRecordsSuccessful => ("conflation", "Records successfully conflated", None),
+            MetricName::ConflationRecordsFailed => ("conflation", "Records failed during conflation", None),
+            MetricName::ConflationConfidenceScore => ("conflation", "Entity resolution confidence score", None),
+            MetricName::ConflationNewEntities => ("conflation", "New canonical entities created", None),
+            MetricName::ConflationMatchedExisting => ("conflation", "Records matched to existing entities", None),
+            MetricName::ConflationUpdatedExisting => ("conflation", "Existing entities updated", None),
+            MetricName::ConflationDuplicates => ("conflation", "Duplicate records identified", None),
+            MetricName::ConflationUncertainResolutions => ("conflation", "Uncertain resolution decisions", None),
+            MetricName::ConflationWarnings => ("conflation", "Conflation warnings generated", None),
+            MetricName::ConflationPotentialDuplicates => ("conflation", "Potential duplicates identified", None),
+            MetricName::ConflationAlternativeMatches => ("conflation", "Alternative matches considered", None),
+            MetricName::ConflationOutputFailed => ("conflation", "Failed output operations", None),
+            MetricName::ConflationProcessingDuration => ("conflation", "Conflation processing duration", Some("s")),
+            MetricName::ConflationBatchesProcessed => ("conflation", "Batches processed through conflation", None),
+            MetricName::ConflationBatchesSuccessful => ("conflation", "Successful conflation batches", None),
+            MetricName::ConflationBatchSize => ("conflation", "Conflation batch size", None),
+            MetricName::ConflationBatchProcessingDuration => ("conflation", "Batch processing duration", Some("s")),
+            MetricName::ConflationBatchRecordsSuccessful => ("conflation", "Records successfully processed in batch", None),
+            MetricName::ConflationBatchRecordsFailed => ("conflation", "Records failed in batch processing", None),
+            
         }
     }
 

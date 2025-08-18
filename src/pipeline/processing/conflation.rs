@@ -239,7 +239,7 @@ impl DefaultConflator {
         
         match &record.quality_assessed_record.normalized_record.entity {
             NormalizedEntity::Venue(venue) => Some(venue.name.clone()),
-            NormalizedEntity::Event(event) => Some(event.name.clone()),
+            NormalizedEntity::Event(event) => Some(event.title.clone()),
             NormalizedEntity::Artist(artist) => Some(artist.name.clone()),
         }
     }
@@ -337,14 +337,13 @@ impl DefaultConflator {
                 ((venue.longitude * 10000.0).round() as i64).hash(&mut hasher);
             }
             NormalizedEntity::Event(event) => {
-                event.name_lower.hash(&mut hasher);
-                event.event_date.hash(&mut hasher);
-                if let Some(venue_name) = &event.venue_name {
-                    venue_name.hash(&mut hasher);
-                }
+                event.title.to_lowercase().hash(&mut hasher);
+                event.event_day.hash(&mut hasher);
+                // Events don't have venue_name field directly - they have venue_id
+                event.venue_id.hash(&mut hasher);
             }
             NormalizedEntity::Artist(artist) => {
-                artist.name_lower.hash(&mut hasher);
+                artist.name.to_lowercase().hash(&mut hasher);
                 // Artists are harder to deduplicate - might need manual review
             }
         }
@@ -552,21 +551,21 @@ impl Conflator for DefaultConflator {
             }
             
             (NormalizedEntity::Event(e1), NormalizedEntity::Event(e2)) => {
-                let name_similarity = self.calculate_text_similarity(&e1.name, &e2.name);
+                let name_similarity = self.calculate_text_similarity(&e1.title, &e2.title);
                 
-                // Date similarity
-                let date_diff = (e1.event_date - e2.event_date).num_hours().abs();
+                // Date similarity - convert NaiveDate to datetime for comparison
+                let date_diff = (e1.event_day.and_hms_opt(0, 0, 0).unwrap() - e2.event_day.and_hms_opt(0, 0, 0).unwrap()).num_hours().abs();
                 let date_similarity = if date_diff <= self.config.max_event_time_diff_hours {
                     1.0 - (date_diff as f64 / self.config.max_event_time_diff_hours as f64)
                 } else {
                     0.0
                 };
                 
-                // Venue similarity if both have venue names
-                let venue_similarity = match (&e1.venue_name, &e2.venue_name) {
-                    (Some(v1), Some(v2)) => self.calculate_text_similarity(v1, v2),
-                    (None, None) => 0.8, // Both missing venue names - partial match
-                    _ => 0.5, // One missing venue name - lower similarity
+                // Venue similarity based on venue_id match
+                let venue_similarity = if e1.venue_id == e2.venue_id {
+                    1.0 // Same venue
+                } else {
+                    0.0 // Different venues
                 };
                 
                 // Weighted average: name (50%), date (30%), venue (20%)
