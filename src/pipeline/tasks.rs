@@ -270,14 +270,13 @@ pub async fn parse_run(
     // Optionally create normalize use case if normalization is enabled
     let normalize_uc = if params.normalize.unwrap_or(false) {
         use crate::app::normalize_use_case::NormalizeUseCase;
-        use crate::pipeline::processing::normalize::DefaultNormalizer;
         use crate::infra::normalize_output_adapter::FileNormalizeOutputAdapter;
         
         let normalized_output = output.replace(".ndjson", "_normalized.ndjson");
         let normalized_path = output_dir.join(format!("{}_{}", ts, Path::new(&normalized_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("normalized.ndjson")).to_string_lossy()));
         let normalize_adapter = FileNormalizeOutputAdapter::new(&normalized_path.to_string_lossy())?;
         
-        Some((NormalizeUseCase::new(Box::new(DefaultNormalizer { geocoder: None }), Box::new(normalize_adapter)), normalized_path))
+        Some((NormalizeUseCase::new(Box::new(normalize_adapter)), normalized_path))
     } else {
         None
     };

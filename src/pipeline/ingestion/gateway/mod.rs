@@ -32,31 +32,38 @@ impl Gateway {
     ) -> anyhow::Result<StampedEnvelopeV1> {
         let t0 = std::time::Instant::now();
 
-        // Dedupe by idempotency_key (SQLite-backed)
+        // Check if cadence is bypassed
+        let bypass_cadence = std::env::var("SMS_BYPASS_CADENCE")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        // Dedupe by idempotency_key (SQLite-backed) - only if not bypassing cadence
         let meta = IngestMeta::open_at_root(&self.root)?;
         let idk = env.idempotency_key.clone();
-        if let Some(existing_id) = meta.get_envelope_by_idk(&idk)? {
-            crate::observability::metrics::gateway::envelope_deduplicated();
-            let accepted_at = Utc::now();
-            let envelope_id = Uuid::new_v4().to_string();
-            let dup = StampedEnvelopeV1 {
-                envelope_version: env.envelope_version.clone(),
-                envelope_id: envelope_id.clone(),
-                accepted_at,
-                payload_ref: String::new(),
-                dedupe_of: Some(existing_id.clone()),
-                envelope: EnvelopeSubmissionV1 {
-                    timing: crate::pipeline::ingestion::envelope::TimingMeta {
-                        gateway_received_at: Some(accepted_at),
-                        ..env.timing.clone()
+        if !bypass_cadence {
+            if let Some(existing_id) = meta.get_envelope_by_idk(&idk)? {
+                crate::observability::metrics::gateway::envelope_deduplicated();
+                let accepted_at = Utc::now();
+                let envelope_id = Uuid::new_v4().to_string();
+                let dup = StampedEnvelopeV1 {
+                    envelope_version: env.envelope_version.clone(),
+                    envelope_id: envelope_id.clone(),
+                    accepted_at,
+                    payload_ref: String::new(),
+                    dedupe_of: Some(existing_id.clone()),
+                    envelope: EnvelopeSubmissionV1 {
+                        timing: crate::pipeline::ingestion::envelope::TimingMeta {
+                            gateway_received_at: Some(accepted_at),
+                            ..env.timing.clone()
+                        },
+                        ..env.clone()
                     },
-                    ..env.clone()
-                },
-            };
-            ingest_log::append_rotating(&self.root.join("ingest_log"), &dup)?;
-            let dur = t0.elapsed().as_secs_f64();
-            crate::observability::metrics::gateway::processing_duration(dur);
-            return Ok(dup);
+                };
+                ingest_log::append_rotating(&self.root.join("ingest_log"), &dup)?;
+                let dur = t0.elapsed().as_secs_f64();
+                crate::observability::metrics::gateway::processing_duration(dur);
+                return Ok(dup);
+            }
         }
 
         let _bytes = payload_bytes.len();

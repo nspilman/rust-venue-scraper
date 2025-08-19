@@ -30,7 +30,8 @@ pub trait Storage: Send + Sync {
     async fn create_raw_data(&self, raw_data: &mut RawData) -> Result<()>;
     async fn get_unprocessed_raw_data(
         &self,
-        limit: Option<i64>
+        api_name: &str,
+        min_date: Option<NaiveDate>
     ) -> Result<Vec<RawData>>;
     async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()>;
     

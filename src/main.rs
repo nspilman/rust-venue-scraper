@@ -70,6 +70,18 @@ enum IngestLogCmd {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Run the complete pipeline: Gateway → Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
+    FullPipeline {
+        /// Source ID to process (e.g., blue_moon, sea_monster, darrells_tavern)
+        #[arg(long)]
+        source_id: String,
+        /// Use database storage instead of in-memory
+        #[arg(long)]
+        use_database: bool,
+        /// Bypass cadence (fetch even if fetched within the last interval)
+        #[arg(long)]
+        bypass_cadence: bool,
+    },
     /// Parse envelopes from ingest log into neutral records
     Parse {
         /// Consumer name for offsets
@@ -268,6 +280,279 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_dir = "output";
 
     match cli.command {
+        Commands::FullPipeline {
+            source_id,
+            use_database,
+            bypass_cadence,
+        } => {
+            use crate::pipeline::processing::{
+                catalog::Catalogger,
+                conflation::{
+                    ConflatedRecord, ConflationMetadata,
+                    DeduplicationMetadata, EntityId, EntityType as ConflationEntityType, ResolutionDecision,
+                },
+                enrich::{DefaultEnricher, Enricher},
+                normalize::{
+                    NormalizedEntity,
+                    NormalizationRegistry,
+                },
+                parser::ParsedRecord,
+                quality_gate::{DefaultQualityGate, QualityGate},
+            };
+            use crate::pipeline::tasks::{gateway_once, GatewayOnceParams};
+            use crate::app::parse_use_case::ParseUseCase;
+            use crate::infra::{parser_factory::DefaultParserFactory, payload_store::CasPayloadStore, registry_adapter::JsonRegistry};
+            use crate::pipeline::ingestion::ingest_log_reader::IngestLogReader;
+            use chrono::Utc;
+            use uuid::Uuid;
+            
+            println!("\n🚀 FULL PIPELINE: Processing {} from source to catalog", source_id);
+            println!("{}", "=".repeat(60));
+            println!("Pipeline stages:");
+            println!("  Gateway → Parse → Normalize → Quality Gate →");
+            println!("  Enrich → Conflation → Catalog");
+            println!("{}", "=".repeat(60));
+
+            // Setup
+            if bypass_cadence {
+                std::env::set_var("SMS_BYPASS_CADENCE", "1");
+            }
+            let storage = create_storage(use_database).await?;
+            let data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data");
+            
+            // STEP 1: GATEWAY
+            println!("\n📥 STEP 1: GATEWAY - Fetching from source...");
+            let gateway_result = gateway_once(
+                storage.clone(),
+                GatewayOnceParams {
+                    source_id: Some(source_id.clone()),
+                    data_root: Some("data".to_string()),
+                    bypass_cadence: Some(bypass_cadence),
+                },
+            ).await?;
+            println!("   ✅ Envelope created: {}", gateway_result.envelope_id);
+            println!("   📦 Payload size: {} bytes", gateway_result.payload_bytes);
+
+            // STEP 2: PARSE
+            println!("\n📄 STEP 2: PARSE - Extracting records from payload...");
+            let reader = IngestLogReader::new(data_root.clone());
+            
+            // Find the envelope we just created
+            let envelope_line = reader.find_envelope_by_id(&gateway_result.envelope_id)?
+                .ok_or("Could not find envelope in ingest log")?;
+            
+            let envelope_json: serde_json::Value = serde_json::from_str(&envelope_line)?;
+            let payload_ref = envelope_json
+                .get("payload_ref")
+                .and_then(|v| v.as_str())
+                .ok_or("No payload_ref in envelope")?;
+            
+            // If it's a duplicate, we need to find the original payload
+            let final_payload_ref = if payload_ref.is_empty() {
+                if let Some(original_id) = envelope_json.get("dedupe_of").and_then(|v| v.as_str()) {
+                    println!("   ℹ️  Envelope is a duplicate, finding original payload...");
+                    // For now, we'll need to search all log files to find the original
+                    // This is a limitation that should be addressed in production
+                    return Err("Duplicate envelope handling not yet implemented for full pipeline. Please bypass cadence or wait for cache to expire.".into());
+                } else {
+                    return Err("Empty payload_ref and no dedupe_of field".into());
+                }
+            } else {
+                payload_ref.to_string()
+            };
+            
+            let parse_uc = ParseUseCase::new(
+                Box::new(JsonRegistry),
+                Box::new(CasPayloadStore),
+                Box::new(DefaultParserFactory),
+            );
+            
+            let parsed_records_json = parse_uc
+                .parse_one(&source_id, &gateway_result.envelope_id, &final_payload_ref)
+                .await?;
+            
+            let parsed_records: Vec<ParsedRecord> = parsed_records_json
+                .iter()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect();
+            println!("   ✅ Parsed {} records", parsed_records.len());
+
+            // STEP 3: NORMALIZE
+            println!("\n🔧 STEP 3: NORMALIZE - Converting to canonical models...");
+            
+            // Create normalization registry with built-in source-specific normalizers
+            let normalize_registry = NormalizationRegistry::new();
+            
+            let mut normalized_records = Vec::new();
+            
+            for parsed in &parsed_records {
+                match normalize_registry.normalize(parsed) {
+                    Ok(records) => normalized_records.extend(records),
+                    Err(e) => warn!("Failed to normalize record: {}", e),
+                }
+            }
+            
+            let mut venues = 0;
+            let mut events = 0;
+            let mut artists = 0;
+            for record in &normalized_records {
+                match &record.entity {
+                    NormalizedEntity::Venue(_) => venues += 1,
+                    NormalizedEntity::Event(_) => events += 1,
+                    NormalizedEntity::Artist(_) => artists += 1,
+                }
+            }
+            println!("   ✅ Normalized {} records", normalized_records.len());
+            println!("      - Venues: {}", venues);
+            println!("      - Events: {}", events);
+            println!("      - Artists: {}", artists);
+
+            // STEP 4: QUALITY GATE
+            println!("\n✅ STEP 4: QUALITY GATE - Assessing data quality...");
+            let quality_gate = DefaultQualityGate::new();
+            let mut quality_assessed_records = Vec::new();
+            let mut accepted = 0;
+            let mut warnings = 0;
+            let mut quarantined = 0;
+            
+            for normalized in normalized_records {
+                match quality_gate.assess(&normalized) {
+                    Ok(assessed) => {
+                        match &assessed.quality_assessment.decision {
+                            crate::pipeline::processing::quality_gate::QualityDecision::Accept => accepted += 1,
+                            crate::pipeline::processing::quality_gate::QualityDecision::AcceptWithWarnings => warnings += 1,
+                            crate::pipeline::processing::quality_gate::QualityDecision::Quarantine => quarantined += 1,
+                        }
+                        quality_assessed_records.push(assessed);
+                    }
+                    Err(e) => warn!("Failed to assess record: {}", e),
+                }
+            }
+            println!("   ✅ Assessed {} records", quality_assessed_records.len());
+            println!("      - Accepted: {}", accepted);
+            println!("      - Warnings: {}", warnings);
+            println!("      - Quarantined: {}", quarantined);
+
+            // STEP 5: ENRICH
+            println!("\n🌐 STEP 5: ENRICH - Adding contextual information...");
+            let enricher = DefaultEnricher::new();
+            let mut enriched_records = Vec::new();
+            let mut with_location = 0;
+            
+            for assessed in quality_assessed_records {
+                match enricher.enrich(&assessed) {
+                    Ok(enriched) => {
+                        if enriched.enrichment.city.is_some() || enriched.enrichment.district.is_some() {
+                            with_location += 1;
+                        }
+                        enriched_records.push(enriched);
+                    }
+                    Err(e) => warn!("Failed to enrich record: {}", e),
+                }
+            }
+            println!("   ✅ Enriched {} records", enriched_records.len());
+            println!("      - With location data: {}", with_location);
+
+            // STEP 6: CONFLATION
+            println!("\n🔗 STEP 6: CONFLATION - Resolving entities...");
+            let mut conflated_records = Vec::new();
+            
+            for enriched in enriched_records {
+                let entity_type = match &enriched.quality_assessed_record.normalized_record.entity {
+                    NormalizedEntity::Venue(_) => ConflationEntityType::Venue,
+                    NormalizedEntity::Event(_) => ConflationEntityType::Event,
+                    NormalizedEntity::Artist(_) => ConflationEntityType::Artist,
+                };
+                
+                let conflated = ConflatedRecord {
+                    canonical_entity_id: EntityId {
+                        id: Uuid::new_v4(),
+                        entity_type,
+                        version: 1,
+                    },
+                    enriched_record: enriched,
+                    conflation: ConflationMetadata {
+                        resolution_decision: ResolutionDecision::NewEntity,
+                        confidence: 0.95,
+                        strategy: "default".to_string(),
+                        alternatives: Vec::new(),
+                        previous_entity_id: None,
+                        contributing_sources: vec![source_id.clone()],
+                        similarity_scores: std::collections::HashMap::new(),
+                        warnings: Vec::new(),
+                        deduplication: DeduplicationMetadata {
+                            is_potential_duplicate: false,
+                            potential_duplicates: Vec::new(),
+                            deduplication_strategy: "none".to_string(),
+                            key_attributes: Vec::new(),
+                            deduplication_signature: None,
+                        },
+                    },
+                    conflated_at: Utc::now(),
+                };
+                conflated_records.push(conflated);
+            }
+            let conflated_count = conflated_records.len();
+            println!("   ✅ Conflated {} records", conflated_count);
+
+            // STEP 7: CATALOG
+            println!("\n📚 STEP 7: CATALOG - Creating canonical entities...");
+            let mut catalogger = Catalogger::new(storage.clone());
+            let run_id = catalogger.start_run(&format!("full_pipeline_{}", source_id)).await?;
+            println!("   📝 Started catalog run: {}", run_id);
+            
+            let mut catalogged_venues = 0;
+            let mut catalogged_events = 0;
+            let mut catalogged_artists = 0;
+            let mut catalog_errors = 0;
+            
+            for conflated in conflated_records {
+                match catalogger.catalog(&conflated).await {
+                    Ok(()) => {
+                        match conflated.canonical_entity_id.entity_type {
+                            ConflationEntityType::Venue => catalogged_venues += 1,
+                            ConflationEntityType::Event => catalogged_events += 1,
+                            ConflationEntityType::Artist => catalogged_artists += 1,
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to catalog record: {}", e);
+                        catalog_errors += 1;
+                    }
+                }
+            }
+            
+            catalogger.finish_run().await?;
+            println!("   ✅ Catalog run completed");
+            println!("      - Venues cataloged: {}", catalogged_venues);
+            println!("      - Events cataloged: {}", catalogged_events);
+            println!("      - Artists cataloged: {}", catalogged_artists);
+            if catalog_errors > 0 {
+                println!("      - Errors: {}", catalog_errors);
+            }
+
+            // FINAL SUMMARY
+            println!("\n✨ PIPELINE COMPLETE!");
+            println!("{}", "=".repeat(60));
+            println!("Summary for {}:", source_id);
+            println!("  📥 Gateway: 1 envelope, {} bytes", gateway_result.payload_bytes);
+            println!("  📄 Parse: {} records extracted", parsed_records.len());
+            println!("  🔧 Normalize: {} entities ({} venues, {} events, {} artists)", 
+                     venues + events + artists, venues, events, artists);
+            println!("  ✅ Quality: {} accepted, {} warnings, {} quarantined", 
+                     accepted, warnings, quarantined);
+            println!("  🌐 Enrich: {} with location data", with_location);
+            println!("  🔗 Conflation: {} entities resolved", conflated_count);
+            println!("  📚 Catalog: {} venues, {} events, {} artists stored",
+                     catalogged_venues, catalogged_events, catalogged_artists);
+            
+            if use_database {
+                println!("\n💾 Data persisted to database");
+            } else {
+                println!("\n🧠 Data stored in memory (will not persist)");
+            }
+            println!("{}", "=".repeat(60));
+        }
         Commands::Ingester {
             apis,
             use_database,

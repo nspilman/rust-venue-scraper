@@ -17,6 +17,13 @@ path = "src/bin/build-dashboard.rs"
 name = "demo-quality-gate-metrics"
 path = "src/bin/demo-quality-gate-metrics.rs"
 
+[[bin]]
+name = "demo-full-pipeline"
+path = "src/bin/demo-full-pipeline.rs"
+
+[[bin]]
+name = "validate-envelope"
+path = "src/bin/validate-envelope.rs"
 
 [dependencies]
 # Async runtime and HTTP client

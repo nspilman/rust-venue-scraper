@@ -133,22 +133,22 @@ impl Storage for InMemoryStorage {
 
     async fn get_unprocessed_raw_data(
         &self,
-        limit: Option<i64>,
+        api_name: &str,
+        min_date: Option<NaiveDate>,
     ) -> Result<Vec<RawData>> {
         let raw_data_map = self.raw_data.lock().unwrap();
         let mut raw_data: Vec<RawData> = raw_data_map
             .values()
-            .filter(|r| !r.processed)
+            .filter(|r| {
+                r.api_name == api_name
+                    && !r.processed
+                    && (min_date.is_none() || r.event_day >= min_date.unwrap())
+            })
             .cloned()
             .collect();
 
         // Sort by event_day for consistent processing order
         raw_data.sort_by_key(|r| r.event_day);
-
-        // Apply limit if provided
-        if let Some(limit) = limit {
-            raw_data.truncate(limit as usize);
-        }
 
         Ok(raw_data)
     }
