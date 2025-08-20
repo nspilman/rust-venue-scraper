@@ -1,3 +1,9 @@
+use anyhow::Result;
+use crate::app::ports::EnrichOutputPort;
+use crate::pipeline::processing::enrich::{
+    Enricher, EnrichedRecord, DefaultEnricher, MetricsEnricher
+};
+use crate::pipeline::processing::quality_gate::QualityAssessedRecord;
 
 /// Use case for enriching quality-assessed records with contextual metadata
 pub struct EnrichUseCase {

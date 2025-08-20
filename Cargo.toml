@@ -94,6 +94,10 @@ once_cell = "1.19"
 # Random number generation for demos
 rand = "0.8"
 
+[dev-dependencies]
+# Temporary files for testing
+tempfile = "3.0"
+
 [features]
 # Default build excludes database (Turso/libSQL) to minimize image size and build time.
 default = []

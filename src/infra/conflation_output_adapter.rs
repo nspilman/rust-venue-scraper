@@ -150,39 +150,36 @@ mod tests {
             neighborhood: None,
             show_venue: true,
             created_at: Utc::now(),
-            updated_at: Utc::now(),
         };
 
         let normalized_record = NormalizedRecord {
-            id: Uuid::new_v4(),
             entity: NormalizedEntity::Venue(venue),
-            normalized_at: Utc::now(),
+            provenance: RecordProvenance {
+                envelope_id: "test_envelope".to_string(),
+                source_id: "test_source".to_string(),
+                payload_ref: "test_payload".to_string(),
+                record_path: "$.venues[0]".to_string(),
+                normalized_at: Utc::now(),
+            },
             normalization: NormalizationMetadata {
-                strategy: "test".to_string(),
                 confidence: 1.0,
                 warnings: Vec::new(),
-                transformations: Vec::new(),
-            },
-            provenance: RecordProvenance {
-                envelope_id: Uuid::new_v4(),
-                source_id: "test_source".to_string(),
-                source_record_id: "test_record".to_string(),
-                ingested_at: Utc::now(),
+                geocoded: false,
+                strategy: "test".to_string(),
             },
         };
 
         let quality_assessment = QualityAssessment {
-            quality_score: 0.95,
             decision: QualityDecision::Accept,
-            checks_passed: 5,
-            checks_failed: 0,
-            quality_issues: Vec::new(),
-            assessed_at: Utc::now(),
+            quality_score: 0.95,
+            issues: Vec::new(),
+            rule_version: "v1.0.0".to_string(),
         };
 
         let quality_assessed_record = QualityAssessedRecord {
             normalized_record,
             quality_assessment,
+            assessed_at: Utc::now(),
         };
 
         let enrichment = EnrichmentMetadata {

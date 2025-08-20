@@ -95,7 +95,12 @@ pub struct MetricsEnricher<E: Enricher> {
     inner: E,
 }
 
-impl<E: Enricher> MetricsEnricher<E> {}
+impl<E: Enricher> MetricsEnricher<E> {
+    /// Create a new metrics enricher wrapping the given enricher
+    pub fn new(inner: E) -> Self {
+        Self { inner }
+    }
+}
 
 impl<E: Enricher> Enricher for MetricsEnricher<E> {
     fn enrich(&self, record: &QualityAssessedRecord) -> anyhow::Result<EnrichedRecord> {

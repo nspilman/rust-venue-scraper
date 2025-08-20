@@ -1,3 +1,9 @@
+use anyhow::Result;
+use crate::app::ports::QualityGateOutputPort;
+use crate::pipeline::processing::normalize::NormalizedRecord;
+use crate::pipeline::processing::quality_gate::{
+    QualityGate, QualityAssessedRecord, QualityDecision, DefaultQualityGate, MetricsQualityGate
+};
 
 /// Use case for assessing quality of normalized records through the Quality Gate
 pub struct QualityGateUseCase {
