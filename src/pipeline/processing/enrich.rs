@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::pipeline::processing::quality_gate::QualityAssessedRecord;
+use crate::observability::metrics;
 
 /// An enriched record that has passed through quality gate and been enhanced
 /// with contextual information like spatial bins, city tags, and routing labels
@@ -89,6 +90,55 @@ pub trait Enricher {
     fn enrich(&self, record: &QualityAssessedRecord) -> anyhow::Result<EnrichedRecord>;
 }
 
+/// A wrapper that adds metrics to any enricher implementation
+pub struct MetricsEnricher<E: Enricher> {
+    inner: E,
+}
+
+impl<E: Enricher> MetricsEnricher<E> {}
+
+impl<E: Enricher> Enricher for MetricsEnricher<E> {
+    fn enrich(&self, record: &QualityAssessedRecord) -> anyhow::Result<EnrichedRecord> {
+        match self.inner.enrich(record) {
+            Ok(enriched_record) => {
+                // Record successful enrichment with strategy
+                let strategy = &enriched_record.enrichment.strategy;
+                metrics::enrich::record_enriched(strategy);
+                
+                // Record confidence level
+                metrics::enrich::confidence_recorded(enriched_record.enrichment.confidence);
+                
+                // Record spatial binning if performed
+                if enriched_record.enrichment.spatial_bin.is_some() {
+                    metrics::enrich::spatial_binning_performed();
+                }
+                
+                // Record city identification if performed
+                if enriched_record.enrichment.city.is_some() {
+                    metrics::enrich::city_tagging_performed();
+                }
+                
+                // Record number of tags added
+                if !enriched_record.enrichment.tags.is_empty() {
+                    metrics::enrich::tags_added(enriched_record.enrichment.tags.len());
+                }
+                
+                // Record warnings
+                for warning in &enriched_record.enrichment.warnings {
+                    metrics::enrich::warning_logged(warning);
+                }
+                
+                Ok(enriched_record)
+            }
+            Err(e) => {
+                // Record enrichment error
+                metrics::enrich::warning_logged("enrichment_error");
+                Err(e)
+            }
+        }
+    }
+}
+
 /// Default enricher that adds Seattle-area specific contextual information
 pub struct DefaultEnricher {
     /// Seattle city center coordinates for distance calculations
@@ -120,13 +170,6 @@ impl DefaultEnricher {
         Self::default()
     }
 
-    /// Create an enricher with custom city center
-    pub fn with_city_center(lat: f64, lng: f64) -> Self {
-        Self {
-            city_center: (lat, lng),
-            ..Default::default()
-        }
-    }
 
     /// Calculate distance between two coordinates in kilometers
     fn calculate_distance(&self, lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {

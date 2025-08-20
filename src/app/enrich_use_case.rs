@@ -1,8 +1,3 @@
-use anyhow::Result;
-
-use crate::app::ports::EnrichOutputPort;
-use crate::pipeline::processing::quality_gate::QualityAssessedRecord;
-use crate::pipeline::processing::enrich::{DefaultEnricher, EnrichedRecord, Enricher};
 
 /// Use case for enriching quality-assessed records with contextual metadata
 pub struct EnrichUseCase {
@@ -24,37 +19,15 @@ impl EnrichUseCase {
     /// Create a use case with the default enricher
     pub fn with_default_enricher(output: Box<dyn EnrichOutputPort>) -> Self {
         Self {
-            enricher: Box::new(DefaultEnricher::new()),
+            enricher: Box::new(MetricsEnricher::new(DefaultEnricher::new())),
             output,
         }
     }
 
     /// Enrich a single quality-assessed record
     pub async fn enrich_record(&self, record: &QualityAssessedRecord) -> Result<EnrichedRecord> {
-        // Apply enrichment logic
+        // Apply enrichment logic (metrics are handled by MetricsEnricher wrapper)
         let enriched_record = self.enricher.enrich(record)?;
-
-        // Emit metrics for enrichment
-        crate::observability::metrics::enrich::record_enriched(&enriched_record.enrichment.strategy);
-        crate::observability::metrics::enrich::confidence_recorded(enriched_record.enrichment.confidence);
-        
-        // Record spatial binning if performed
-        if enriched_record.enrichment.spatial_bin.is_some() {
-            crate::observability::metrics::enrich::spatial_binning_performed();
-        }
-        
-        // Record city tagging if performed
-        if enriched_record.enrichment.city.is_some() {
-            crate::observability::metrics::enrich::city_tagging_performed();
-        }
-        
-        // Record warnings
-        for warning in &enriched_record.enrichment.warnings {
-            crate::observability::metrics::enrich::warning_logged(warning);
-        }
-        
-        // Record tag counts
-        crate::observability::metrics::enrich::tags_added(enriched_record.enrichment.tags.len());
 
         // Write enriched record to output
         self.output.write_enriched_record(&enriched_record).await?;

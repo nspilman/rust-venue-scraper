@@ -3,13 +3,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 use tracing::{debug, info, warn};
 
-use crate::common::error::{Result, ScraperError};
+use crate::common::error::Result;
 use crate::domain::ProcessRun;
 use crate::pipeline::processing::conflation::ConflatedRecord;
 use crate::pipeline::storage::Storage;
 
 use super::handlers::{ArtistHandler, EventHandler, VenueHandler};
-use super::registry::{EntityRegistry, ProcessingStats};
+use super::registry::EntityRegistry;
+use super::mapper::MapperRegistry;
 
 /// Registry-based catalogger that uses handlers for entity processing
 pub struct Catalogger {
@@ -19,14 +20,20 @@ pub struct Catalogger {
 }
 
 impl Catalogger {
+    /// Test-only: list entity types handled by registered handlers
+    #[cfg(test)]
+    pub fn supported_entity_types(&self) -> Vec<&'static str> {
+        self.registry.registered_types()
+    }
     /// Create a new catalogger with default handlers registered
     pub fn new(storage: Arc<dyn Storage>) -> Self {
         let mut registry = EntityRegistry::new();
+        let mappers = Arc::new(MapperRegistry::default());
         
-        // Register default handlers
-        registry.register(Arc::new(VenueHandler::new()));
-        registry.register(Arc::new(EventHandler::new()));
-        registry.register(Arc::new(ArtistHandler::new()));
+        // Register default handlers wired with mappers
+        registry.register(Arc::new(VenueHandler::with_mappers(mappers.clone())));
+        registry.register(Arc::new(EventHandler::with_mappers(mappers.clone())));
+        registry.register(Arc::new(ArtistHandler::with_mappers(mappers.clone())));
         
         info!("Initialized Catalogger with {} handlers", registry.handler_count());
         
@@ -36,16 +43,12 @@ impl Catalogger {
             process_run_id: None,
         }
     }
-    
-    /// Create a new catalogger with a custom registry
+
+    /// Test-only: create with custom registry
+    #[cfg(test)]
     pub fn with_registry(storage: Arc<dyn Storage>, registry: EntityRegistry) -> Self {
         info!("Initialized Catalogger with custom registry containing {} handlers", registry.handler_count());
-        
-        Self {
-            storage,
-            registry,
-            process_run_id: None,
-        }
+        Self { storage, registry, process_run_id: None }
     }
     
     /// Start a new catalog processing run
@@ -129,10 +132,6 @@ impl Catalogger {
         Ok(())
     }
     
-    /// Get the entity types handled by this catalogger
-    pub fn supported_entity_types(&self) -> Vec<&'static str> {
-        self.registry.registered_types()
-    }
 }
 
 #[cfg(test)]

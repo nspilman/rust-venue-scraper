@@ -26,14 +26,6 @@ impl ConflationOutputAdapter {
         }
     }
 
-    /// Create adapter with custom partitioning settings
-    pub fn with_partitioning(output_dir: PathBuf, use_date_partitioning: bool) -> Self {
-        Self {
-            output_dir,
-            use_date_partitioning,
-        }
-    }
-
     /// Determine the output file path for a conflated record
     fn get_output_path(&self, record: &ConflatedRecord) -> PathBuf {
         let mut path = self.output_dir.clone();
@@ -296,10 +288,8 @@ mod tests {
     #[tokio::test]
     async fn test_no_date_partitioning() {
         let temp_dir = TempDir::new().unwrap();
-        let adapter = ConflationOutputAdapter::with_partitioning(
-            temp_dir.path().to_path_buf(),
-            false
-        );
+        let mut adapter = ConflationOutputAdapter::new(temp_dir.path().to_path_buf());
+        adapter.use_date_partitioning = false;
         
         let conflated_record = create_test_conflated_record();
         let output_path = adapter.get_output_path(&conflated_record);

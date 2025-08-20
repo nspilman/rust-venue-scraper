@@ -281,24 +281,8 @@ pub async fn parse_run(
         None
     };
     
-    // Optionally create quality gate use case if quality gate is enabled (requires normalization)
-    let quality_gate_uc = if params.quality_gate.unwrap_or(false) && params.normalize.unwrap_or(false) {
-        use crate::app::quality_gate_use_case::QualityGateUseCase;
-        use crate::infra::quality_gate_output_adapter::FileQualityGateOutputAdapter;
-        
-        let accepted_output = output.replace(".ndjson", "_accepted.ndjson");
-        let quarantined_output = output.replace(".ndjson", "_quarantined.ndjson");
-        
-        let accepted_path = output_dir.join(format!("{}_{}", ts, Path::new(&accepted_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("accepted.ndjson")).to_string_lossy()));
-        let quarantined_path = output_dir.join(format!("{}_{}", ts, Path::new(&quarantined_output).file_name().unwrap_or_else(|| std::ffi::OsStr::new("quarantined.ndjson")).to_string_lossy()));
-        
-        let accepted_adapter = FileQualityGateOutputAdapter::new(&accepted_path.to_string_lossy())?;
-        let quarantined_adapter = FileQualityGateOutputAdapter::new(&quarantined_path.to_string_lossy())?;
-        
-        Some((QualityGateUseCase::with_default_quality_gate(Box::new(accepted_adapter), Box::new(quarantined_adapter)), accepted_path, quarantined_path))
-    } else {
-        None
-    };
+    // Quality gate use case temporarily disabled (use-case layer removed)
+let _quality_gate_uc: Option<()> = None;
     
     use crate::app::ports::RegistryPort;
 
@@ -396,20 +380,8 @@ pub async fn parse_run(
             }
         }
         
-        // Optionally run quality gate assessment on normalized records
-        if let Some((ref qg_uc, _, _)) = quality_gate_uc {
-            if !normalized_records.is_empty() {
-                info!("quality_gate: processing {} normalized records from envelope_id={}", normalized_records.len(), envelope_id);
-                match qg_uc.assess_batch(&normalized_records).await {
-                    Ok(assessed_records) => {
-                        info!("quality_gate: successfully assessed {} records from envelope_id={}", assessed_records.len(), envelope_id);
-                    },
-                    Err(e) => {
-                        warn!("quality_gate: failed to assess batch from envelope_id={}: {}", envelope_id, e);
-                    }
-                }
-            }
-        }
+        // Quality gate assessment skipped (use-case layer removed)
+        let _ = &normalized_records;
         
         // Record gateway metrics for records ingested from this envelope
         if !rec_lines.is_empty() {

@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::pipeline::processing::normalize::NormalizedRecord;
+use crate::observability::metrics;
 
 /// A quality-assessed record that has passed through the Quality Gate checkpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +94,56 @@ pub trait QualityGate {
     fn assess(&self, record: &NormalizedRecord) -> anyhow::Result<QualityAssessedRecord>;
 }
 
+/// A wrapper that adds metrics to any quality gate implementation
+pub struct MetricsQualityGate<Q: QualityGate> {
+    inner: Q,
+}
+
+impl<Q: QualityGate> MetricsQualityGate<Q> {
+    #[cfg(test)]
+    pub fn new(inner: Q) -> Self {
+        Self { inner }
+    }
+}
+
+impl<Q: QualityGate> QualityGate for MetricsQualityGate<Q> {
+    fn assess(&self, record: &NormalizedRecord) -> anyhow::Result<QualityAssessedRecord> {
+        match self.inner.assess(record) {
+            Ok(assessed_record) => {
+                // Record metrics based on the quality decision
+                match assessed_record.quality_assessment.decision {
+                    QualityDecision::Accept => {
+                        metrics::quality_gate::record_accepted();
+                    }
+                    QualityDecision::AcceptWithWarnings => {
+                        metrics::quality_gate::record_accepted_with_warnings();
+                    }
+                    QualityDecision::Quarantine => {
+                        metrics::quality_gate::record_quarantined();
+                    }
+                }
+                
+                // Record quality score
+                metrics::quality_gate::quality_score_recorded(assessed_record.quality_assessment.quality_score);
+                
+                // Record issues by type and severity
+                for issue in &assessed_record.quality_assessment.issues {
+                    let issue_type = format!("{:?}", issue.issue_type);
+                    let severity = format!("{:?}", issue.severity);
+                    metrics::quality_gate::issue_detected(&issue_type, &severity);
+                }
+                
+                Ok(assessed_record)
+            }
+            Err(e) => {
+                // Record assessment errors as quarantined records
+                metrics::quality_gate::record_quarantined();
+                Err(e)
+            }
+        }
+    }
+}
+
 /// Default Quality Gate implementation with configurable rules
 pub struct DefaultQualityGate {
     /// Configuration for quality assessment rules
@@ -140,10 +191,6 @@ impl DefaultQualityGate {
         }
     }
 
-    /// Create a Quality Gate with custom configuration
-    pub fn with_config(config: QualityGateConfig) -> Self {
-        Self { config }
-    }
 
     /// Assess entity-specific quality rules
     fn assess_entity_quality(&self, record: &NormalizedRecord) -> Vec<QualityIssue> {

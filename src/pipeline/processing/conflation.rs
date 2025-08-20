@@ -106,13 +106,15 @@ pub struct DeduplicationMetadata {
 pub struct ConflationConfig {
     /// Minimum confidence threshold for automatic matching
     pub min_confidence_threshold: f64,
-    /// Matching strategies enabled
+    /// Matching strategies enabled (currently unused)
+    #[allow(dead_code)]
     pub enabled_strategies: Vec<MatchingStrategy>,
     /// Maximum distance in km for venue location matching
     pub max_venue_distance_km: f64,
     /// Maximum time difference for event matching (in hours)
     pub max_event_time_diff_hours: i64,
-    /// Similarity threshold for text matching (names, descriptions)
+/// Similarity threshold for text matching (names, descriptions) (currently unused)
+    #[allow(dead_code)]
     pub text_similarity_threshold: f64,
 }
 
@@ -150,9 +152,11 @@ pub struct PotentialMatch {
     pub entity_id: EntityId,
     /// Similarity score (0.0 to 1.0)
     pub similarity_score: f64,
-    /// Breakdown of similarity by attribute
+    /// Breakdown of similarity by attribute (currently unused)
+    #[allow(dead_code)]
     pub similarity_breakdown: HashMap<String, f64>,
-    /// The enriched record of the potential match
+    /// The enriched record of the potential match (currently unused)
+    #[allow(dead_code)]
     pub matched_record: EnrichedRecord,
 }
 
@@ -195,44 +199,7 @@ impl DefaultConflator {
     pub fn new() -> Self {
         Self::default()
     }
-    
-    /// Create a conflator with custom configuration
-    pub fn with_config(config: ConflationConfig) -> Self {
-        Self {
-            config,
-            entity_store: HashMap::new(),
-            name_index: HashMap::new(),
-            location_index: HashMap::new(),
-        }
-    }
-    
-    /// Add a canonical entity to the conflator's knowledge base
-    pub fn add_canonical_entity(&mut self, conflated_record: ConflatedRecord) {
-        let entity_id = conflated_record.canonical_entity_id.clone();
-        
-        // Index by name for fast lookup
-        if let Some(name) = self.extract_entity_name(&conflated_record.enriched_record) {
-            let normalized_name = self.normalize_name(&name);
-            self.name_index
-                .entry(normalized_name)
-                .or_insert_with(Vec::new)
-                .push(entity_id.clone());
-        }
-        
-        // Index by location for venues
-        if entity_id.entity_type == EntityType::Venue {
-            if let Some(location_key) = self.extract_location_key(&conflated_record.enriched_record) {
-                self.location_index
-                    .entry(location_key)
-                    .or_insert_with(Vec::new)
-                    .push(entity_id.clone());
-            }
-        }
-        
-        // Store the canonical entity
-        self.entity_store.insert(entity_id, conflated_record);
-    }
-    
+
     /// Extract entity name from enriched record
     fn extract_entity_name(&self, record: &EnrichedRecord) -> Option<String> {
         use crate::pipeline::processing::normalize::NormalizedEntity;
@@ -354,12 +321,22 @@ impl DefaultConflator {
 
 impl Conflator for DefaultConflator {
     fn conflate(&self, record: &EnrichedRecord) -> anyhow::Result<ConflatedRecord> {
+        // Per-record metric: start processing
+        crate::observability::metrics::conflation::records_processed();
+
         let conflated_at = Utc::now();
         let entity_type = self.determine_entity_type(record);
         let mut warnings = Vec::new();
         
         // Find potential matches
-        let potential_matches = self.find_potential_matches(record)?;
+        let potential_matches = match self.find_potential_matches(record) {
+            Ok(m) => m,
+            Err(e) => {
+                // Per-record metric: failure during matching
+                crate::observability::metrics::conflation::records_failed();
+                return Err(e);
+            }
+        };
         
         // Determine resolution decision based on potential matches
         let (resolution_decision, canonical_entity_id, confidence) = if potential_matches.is_empty() {
@@ -435,16 +412,34 @@ impl Conflator for DefaultConflator {
         ];
         
         let conflation = ConflationMetadata {
-            resolution_decision,
+            resolution_decision: resolution_decision.clone(),
             confidence,
             strategy: "default_conflator_v1".to_string(),
-            alternatives,
+            alternatives: alternatives.clone(),
             previous_entity_id: None, // Would be set for updates
             contributing_sources,
             similarity_scores,
-            warnings,
-            deduplication,
+            warnings: warnings.clone(),
+            deduplication: deduplication.clone(),
         };
+
+        // Per-record metrics after decision
+        crate::observability::metrics::conflation::confidence_score_recorded(confidence);
+        match &resolution_decision {
+            ResolutionDecision::NewEntity => crate::observability::metrics::conflation::new_entity_created(),
+            ResolutionDecision::MatchedExisting(_) => crate::observability::metrics::conflation::matched_existing(),
+            ResolutionDecision::UpdatedExisting(_) => crate::observability::metrics::conflation::updated_existing(),
+            ResolutionDecision::Duplicate(_) => crate::observability::metrics::conflation::duplicate_detected(),
+            ResolutionDecision::Uncertain => crate::observability::metrics::conflation::uncertain_resolution(),
+        }
+        if !warnings.is_empty() {
+            for w in &warnings {
+                crate::observability::metrics::conflation::warning_logged(w);
+            }
+        }
+        crate::observability::metrics::conflation::alternative_matches(alternatives.len());
+        crate::observability::metrics::conflation::potential_duplicates(deduplication.potential_duplicates.len());
+        crate::observability::metrics::conflation::records_successful();
         
         Ok(ConflatedRecord {
             canonical_entity_id,

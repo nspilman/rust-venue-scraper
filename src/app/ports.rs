@@ -59,11 +59,13 @@ pub trait NormalizeOutputPort: Send + Sync {
 
 #[async_trait]
 pub trait QualityGateOutputPort: Send + Sync {
+    #[allow(dead_code)]
     async fn write_quality_assessed_record(&self, record: &crate::pipeline::processing::quality_gate::QualityAssessedRecord) -> anyhow::Result<()>;
 }
 
 #[async_trait]
 pub trait EnrichOutputPort: Send + Sync {
+    #[allow(dead_code)]
     async fn write_enriched_record(&self, record: &crate::pipeline::processing::enrich::EnrichedRecord) -> anyhow::Result<()>;
 }
 

@@ -91,8 +91,6 @@ pub enum MetricName {
     ConflationWarnings,
     ConflationPotentialDuplicates,
     ConflationAlternativeMatches,
-    ConflationOutputFailed,
-    ConflationProcessingDuration,
     ConflationBatchesProcessed,
     ConflationBatchesSuccessful,
     ConflationBatchSize,
@@ -185,8 +183,6 @@ impl fmt::Display for MetricName {
             MetricName::ConflationWarnings => "sms_conflation_warnings_total",
             MetricName::ConflationPotentialDuplicates => "sms_conflation_potential_duplicates_total",
             MetricName::ConflationAlternativeMatches => "sms_conflation_alternative_matches_total",
-            MetricName::ConflationOutputFailed => "sms_conflation_output_failed_total",
-            MetricName::ConflationProcessingDuration => "sms_conflation_processing_duration_seconds",
             MetricName::ConflationBatchesProcessed => "sms_conflation_batches_processed_total",
             MetricName::ConflationBatchesSuccessful => "sms_conflation_batches_successful_total",
             MetricName::ConflationBatchSize => "sms_conflation_batch_size",
@@ -283,8 +279,6 @@ impl MetricName {
             MetricName::ConflationWarnings => "sms_conflation_warnings_total",
             MetricName::ConflationPotentialDuplicates => "sms_conflation_potential_duplicates_total",
             MetricName::ConflationAlternativeMatches => "sms_conflation_alternative_matches_total",
-            MetricName::ConflationOutputFailed => "sms_conflation_output_failed_total",
-            MetricName::ConflationProcessingDuration => "sms_conflation_processing_duration_seconds",
             MetricName::ConflationBatchesProcessed => "sms_conflation_batches_processed_total",
             MetricName::ConflationBatchesSuccessful => "sms_conflation_batches_successful_total",
             MetricName::ConflationBatchSize => "sms_conflation_batch_size",
@@ -461,8 +455,6 @@ impl MetricName {
             MetricName::ConflationWarnings => ("conflation", "Conflation warnings generated", None),
             MetricName::ConflationPotentialDuplicates => ("conflation", "Potential duplicates identified", None),
             MetricName::ConflationAlternativeMatches => ("conflation", "Alternative matches considered", None),
-            MetricName::ConflationOutputFailed => ("conflation", "Failed output operations", None),
-            MetricName::ConflationProcessingDuration => ("conflation", "Conflation processing duration", Some("s")),
             MetricName::ConflationBatchesProcessed => ("conflation", "Batches processed through conflation", None),
             MetricName::ConflationBatchesSuccessful => ("conflation", "Successful conflation batches", None),
             MetricName::ConflationBatchSize => ("conflation", "Conflation batch size", None),
@@ -663,30 +655,6 @@ pub fn heartbeat() {
     });
 }
 
-/// Helper function to emit a counter metric
-pub fn emit_counter(metric_name: MetricName, value: f64) {
-    let name = metric_name.as_str();
-    ::metrics::counter!(name).increment(value as u64);
-    tokio::spawn(async move {
-        let _ = push_single_metric(name, value, "counter").await;
-    });
-}
-
-/// Helper function to emit a histogram metric
-pub fn emit_histogram(metric_name: MetricName, value: f64) {
-    let name = metric_name.as_str();
-    ::metrics::histogram!(name).record(value);
-    // Don't push histograms to pushgateway - let Prometheus handle aggregation
-}
-
-/// Helper function to emit a gauge metric
-pub fn emit_gauge(metric_name: MetricName, value: f64) {
-    let name = metric_name.as_str();
-    ::metrics::gauge!(name).set(value);
-    tokio::spawn(async move {
-        let _ = push_single_metric(name, value, "gauge").await;
-    });
-}
 
 // ============================================================================
 // Sources Metrics
@@ -1045,6 +1013,7 @@ pub mod quality_gate {
     }
     
     /// Record that a batch was processed through the quality gate
+    #[allow(dead_code)]
     pub fn batch_processed(total_records: usize, accepted_count: usize, quarantined_count: usize) {
         // Record batch size
         let metric_name = MetricName::QualityGateBatchSize.as_str();
@@ -1279,6 +1248,7 @@ pub mod enrich {
     }
     
     /// Record that a batch was processed through enrichment
+    #[allow(dead_code)]
     pub fn batch_processed(batch_size: usize) {
         // Record batch size
         let metric_name = MetricName::EnrichBatchSize.as_str();
@@ -1291,5 +1261,161 @@ pub mod enrich {
         tokio::spawn(async move {
             let _ = push_single_metric(batch_metric, 1.0, "counter").await;
         });
+    }
+}
+
+// ============================================================================
+// Conflation Metrics
+// ============================================================================
+
+pub mod conflation {
+    use super::{push_single_metric, MetricName};
+    
+    /// Record that a record was processed through conflation
+    pub fn records_processed() {
+        let metric_name = MetricName::ConflationRecordsProcessed.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a record was successfully conflated
+    pub fn records_successful() {
+        let metric_name = MetricName::ConflationRecordsSuccessful.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that conflation failed for a record
+    pub fn records_failed() {
+        let metric_name = MetricName::ConflationRecordsFailed.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record the confidence score of conflation
+    pub fn confidence_score_recorded(confidence: f64) {
+        let metric_name = MetricName::ConflationConfidenceScore.as_str();
+        ::metrics::histogram!(metric_name).record(confidence);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
+    }
+    
+    /// Record that a new entity was created
+    pub fn new_entity_created() {
+        let metric_name = MetricName::ConflationNewEntities.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a record matched an existing entity
+    pub fn matched_existing() {
+        let metric_name = MetricName::ConflationMatchedExisting.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that an existing entity was updated
+    pub fn updated_existing() {
+        let metric_name = MetricName::ConflationUpdatedExisting.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that a duplicate was detected
+    pub fn duplicate_detected() {
+        let metric_name = MetricName::ConflationDuplicates.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record that conflation resulted in uncertain resolution
+    pub fn uncertain_resolution() {
+        let metric_name = MetricName::ConflationUncertainResolutions.as_str();
+        ::metrics::counter!(metric_name).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record a warning during conflation
+    pub fn warning_logged(warning: &str) {
+        let metric_name = MetricName::ConflationWarnings.as_str();
+        ::metrics::counter!(metric_name, "warning_type" => warning.to_string()).increment(1);
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, 1.0, "counter").await;
+        });
+    }
+    
+    /// Record potential duplicates found
+    pub fn potential_duplicates(count: usize) {
+        let metric_name = MetricName::ConflationPotentialDuplicates.as_str();
+        ::metrics::counter!(metric_name).increment(count as u64);
+        let c = count as f64;
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, c, "counter").await;
+        });
+    }
+    
+    /// Record alternative matches found
+    pub fn alternative_matches(count: usize) {
+        let metric_name = MetricName::ConflationAlternativeMatches.as_str();
+        ::metrics::counter!(metric_name).increment(count as u64);
+        let c = count as f64;
+        tokio::spawn(async move {
+            let _ = push_single_metric(metric_name, c, "counter").await;
+        });
+    }
+    
+    /// Record batch processing metrics
+    pub fn batch_processed(batch_size: usize, successful_count: usize, failed_count: usize) {
+        // Record batch size
+        let batch_size_metric = MetricName::ConflationBatchSize.as_str();
+        ::metrics::histogram!(batch_size_metric).record(batch_size as f64);
+        
+        // Record batch processing
+        let batches_processed = MetricName::ConflationBatchesProcessed.as_str();
+        ::metrics::counter!(batches_processed).increment(1);
+        
+        // Record batch success
+        if failed_count == 0 {
+            let batches_successful = MetricName::ConflationBatchesSuccessful.as_str();
+            ::metrics::counter!(batches_successful).increment(1);
+            tokio::spawn(async move {
+                let _ = push_single_metric(batches_successful, 1.0, "counter").await;
+            });
+        }
+        
+        // Record individual record results
+        let records_successful = MetricName::ConflationBatchRecordsSuccessful.as_str();
+        ::metrics::counter!(records_successful).increment(successful_count as u64);
+        
+        let records_failed = MetricName::ConflationBatchRecordsFailed.as_str();
+        ::metrics::counter!(records_failed).increment(failed_count as u64);
+        
+        tokio::spawn(async move {
+            let _ = push_single_metric(batches_processed, 1.0, "counter").await;
+            let _ = push_single_metric(records_successful, successful_count as f64, "counter").await;
+            let _ = push_single_metric(records_failed, failed_count as f64, "counter").await;
+        });
+    }
+    
+    /// Record batch processing duration
+    pub fn batch_processing_duration(duration_seconds: f64) {
+        let metric_name = MetricName::ConflationBatchProcessingDuration.as_str();
+        ::metrics::histogram!(metric_name).record(duration_seconds);
+        // Don't push histograms to pushgateway - let Prometheus handle aggregation
     }
 }

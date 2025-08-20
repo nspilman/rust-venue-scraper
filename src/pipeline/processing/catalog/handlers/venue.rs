@@ -6,30 +6,27 @@ use uuid::Uuid;
 use crate::common::error::Result;
 use crate::domain::{ProcessRecord, ProcessRun, Venue};
 use crate::pipeline::processing::catalog::candidate::{
-    CatalogCandidate, ChangeSet, FieldChange, PersistedEntity, ProposedEntity
+    CatalogCandidate, ChangeSet, PersistedEntity, ProposedEntity
 };
 use crate::pipeline::processing::catalog::handler::EntityHandler;
 use crate::pipeline::processing::conflation::{ConflatedRecord, EntityType};
-use crate::pipeline::processing::normalize::NormalizedEntity;
 use crate::pipeline::storage::Storage;
 
-pub struct VenueHandler;
+use std::sync::Arc;
+use crate::pipeline::processing::catalog::mapper::MapperRegistry;
+
+pub struct VenueHandler {
+    mappers: Arc<MapperRegistry>,
+}
 
 impl VenueHandler {
+    #[cfg(test)]
     pub fn new() -> Self {
-        VenueHandler
+        Self { mappers: Arc::new(MapperRegistry::default()) }
     }
 
-    /// Extract venue from the normalized entity in the conflated record
-    fn extract_venue_from_record(&self, record: &ConflatedRecord) -> Option<Venue> {
-        // Navigate the proper path: ConflatedRecord -> EnrichedRecord -> QualityAssessedRecord -> NormalizedRecord -> Entity
-        let normalized_entity = &record.enriched_record.quality_assessed_record.normalized_record.entity;
-        
-        if let NormalizedEntity::Venue(venue) = normalized_entity {
-            Some(venue.clone())
-        } else {
-            None
-        }
+    pub fn with_mappers(mappers: Arc<MapperRegistry>) -> Self {
+        Self { mappers }
     }
 
     /// Convert venue to the correct domain model format
@@ -52,18 +49,6 @@ impl VenueHandler {
             show_venue: true,
             created_at: Utc::now(),
         }
-    }
-
-    /// Create a URL-friendly slug from venue name
-    fn create_slug(&self, name: &str) -> String {
-        name.to_lowercase()
-            .chars()
-            .map(|c| if c.is_alphanumeric() { c } else { '-' })
-            .collect::<String>()
-            .split('-')
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join("-")
     }
 
     /// Detect changes between proposed and current venue
@@ -136,7 +121,8 @@ impl EntityHandler for VenueHandler {
         storage: &dyn Storage,
     ) -> Result<Option<CatalogCandidate>> {
         // Step 1: Extract venue from the conflated record
-        let Some(normalized_venue) = self.extract_venue_from_record(record) else {
+        // Use mapper to build base venue from record
+        let Ok(normalized_venue) = self.mappers.venue_mapper.to_venue(record) else {
             debug!("No venue found in conflated record");
             return Ok(None);
         };
@@ -150,7 +136,7 @@ impl EntityHandler for VenueHandler {
             Ok(Some(existing_venue)) => {
                 // Venue exists - check for changes
                 let changes = self.detect_venue_changes(&proposed_venue, &existing_venue);
-                let current_entity = PersistedEntity::Venue(existing_venue);
+let current_entity = PersistedEntity::Venue;
                 
                 Ok(Some(CatalogCandidate::existing_entity(
                     EntityType::Venue,

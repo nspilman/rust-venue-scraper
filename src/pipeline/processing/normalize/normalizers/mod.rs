@@ -8,7 +8,7 @@ pub mod blue_moon;
 pub mod kexp;
 
 // Re-export the main components
-pub use base::{SourceNormalizer, VenueStateManager, ArtistStateManager, NormalizerUtils};
+pub use base::{SourceNormalizer, MetricsNormalizer};
 pub use sea_monster::SeaMonsterNormalizer;
 pub use darrells_tavern::DarrellsTavernNormalizer;
 pub use blue_moon::BlueMoonNormalizer;

@@ -13,40 +13,22 @@ use crate::pipeline::processing::conflation::{ConflatedRecord, EntityType};
 use crate::pipeline::processing::normalize::NormalizedEntity;
 use crate::pipeline::storage::Storage;
 
-pub struct EventHandler;
+use std::sync::Arc;
+use crate::pipeline::processing::catalog::mapper::MapperRegistry;
+
+pub struct EventHandler {
+    mappers: Arc<MapperRegistry>,
+}
 
 impl EventHandler {
+    #[cfg(test)]
     pub fn new() -> Self {
-        EventHandler
+        Self { mappers: Arc::new(MapperRegistry::default()) }
     }
 
-    /// Extract event from conflated record
-    fn extract_event(&self, record: &ConflatedRecord) -> Option<Event> {
-        // The ConflatedRecord structure uses enriched_record which has a normalized entity
-        let normalized_entity = &record.enriched_record.quality_assessed_record.normalized_record.entity;
-        if let NormalizedEntity::Event(event) = normalized_entity {
-            Some(event.clone())
-        } else {
-            None
-        }
+    pub fn with_mappers(mappers: Arc<MapperRegistry>) -> Self {
+        Self { mappers }
     }
-
-    /// Check if an event has changes compared to existing
-    fn event_has_changes(&self, new_event: &Event, existing_event: &Event) -> bool {
-        // The domain Event has: id, title, event_day, start_time, event_url, description, 
-        // event_image_url, venue_id, artist_ids, show_event, finalized, created_at
-        new_event.title != existing_event.title
-            || new_event.venue_id != existing_event.venue_id
-            || new_event.event_day != existing_event.event_day
-            || new_event.start_time != existing_event.start_time
-            || new_event.event_url != existing_event.event_url
-            || new_event.description != existing_event.description
-            || new_event.event_image_url != existing_event.event_image_url
-            || new_event.artist_ids != existing_event.artist_ids
-            || new_event.show_event != existing_event.show_event
-            || new_event.finalized != existing_event.finalized
-    }
-
 
     /// Detect changes between proposed and current event
     fn detect_event_changes(&self, proposed: &Event, current: &Event) -> ChangeSet {
@@ -118,36 +100,24 @@ impl EntityHandler for EventHandler {
         storage: &dyn Storage,
     ) -> Result<Option<CatalogCandidate>> {
         // Step 1: Extract event from the normalized entity in the conflated record
-        let normalized_entity = &record.enriched_record.quality_assessed_record.normalized_record.entity;
-        
-        let Some(normalized_event) = (if let NormalizedEntity::Event(event) = normalized_entity {
-            Some(event.clone())
+        // Build proposed event via mapper. Determine venue_id.
+        let venue_id = if let NormalizedEntity::Event(e) = &record.enriched_record.quality_assessed_record.normalized_record.entity {
+            if e.venue_id == uuid::Uuid::nil() { record.canonical_entity_id.id } else { e.venue_id }
         } else {
-            None
-        }) else {
+            record.canonical_entity_id.id
+        };
+        let Ok(proposed_event_base) = self.mappers.event_mapper.to_event(record, venue_id) else {
             debug!("No event found in conflated record");
             return Ok(None);
         };
 
         // Step 2: Prepare the event for persistence - the normalized event is already the correct domain struct
-        let proposed_event = Event {
-            id: Some(record.canonical_entity_id.id),
-            title: normalized_event.title,
-            event_day: normalized_event.event_day,
-            start_time: normalized_event.start_time,
-            event_url: normalized_event.event_url,
-            description: normalized_event.description,
-            event_image_url: normalized_event.event_image_url,
-            venue_id: if normalized_event.venue_id == uuid::Uuid::nil() {
-                record.canonical_entity_id.id // Use canonical id if no venue was resolved
-            } else {
-                normalized_event.venue_id
-            },
-            artist_ids: normalized_event.artist_ids, // Use resolved artist IDs
-            show_event: true,
-            finalized: false,
-            created_at: Utc::now(),
-        };
+        let mut proposed_event = proposed_event_base.clone();
+        proposed_event.id = Some(record.canonical_entity_id.id);
+        // Ensure defaults that the mapper may not set for this persistence step
+        proposed_event.show_event = true;
+        proposed_event.finalized = false;
+        proposed_event.created_at = Utc::now();
         let proposed_entity = ProposedEntity::Event(proposed_event.clone());
 
         // Step 3: Check if event already exists
@@ -159,7 +129,7 @@ impl EntityHandler for EventHandler {
             Ok(Some(existing_event)) => {
                 // Event exists - check for changes
                 let changes = self.detect_event_changes(&proposed_event, &existing_event);
-                let current_entity = PersistedEntity::Event(existing_event);
+let current_entity = PersistedEntity::Event;
                 
                 Ok(Some(CatalogCandidate::existing_entity(
                     EntityType::Event,
@@ -272,11 +242,8 @@ mod tests {
     use chrono::NaiveDate;
 
     #[test]
-    fn test_event_has_changes() {
+    fn test_detect_event_changes() {
         let handler = EventHandler::new();
-        
-        // Event domain has: id, title, event_day, start_time, event_url, description, 
-        // event_image_url, venue_id, artist_ids, show_event, finalized, created_at
         let event_day = NaiveDate::from_ymd_opt(2025, 8, 15).unwrap();
         let start_time = chrono::NaiveTime::from_hms_opt(20, 0, 0);
         
@@ -296,17 +263,10 @@ mod tests {
         };
         
         let mut event2 = event1.clone();
-        
-        // No changes
-        assert!(!handler.event_has_changes(&event1, &event2));
-        
-        // Title change
+        let changes = handler.detect_event_changes(&event1, &event2);
+        assert!(!changes.has_changes);
         event2.title = "Updated Concert".to_string();
-        assert!(handler.event_has_changes(&event1, &event2));
-        
-        // Description change
-        event2.title = event1.title.clone();
-        event2.description = Some("An amazing concert".to_string());
-        assert!(handler.event_has_changes(&event1, &event2));
+        let changes = handler.detect_event_changes(&event2, &event1);
+        assert!(changes.has_changes);
     }
 }

@@ -290,8 +290,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use crate::pipeline::processing::{
                 catalog::Catalogger,
                 conflation::{
-                    ConflatedRecord, ConflationMetadata,
-                    DeduplicationMetadata, EntityId, EntityType as ConflationEntityType, ResolutionDecision,
+                    EntityType as ConflationEntityType,
                 },
                 enrich::{DefaultEnricher, Enricher},
                 normalize::{
@@ -305,8 +304,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use crate::app::parse_use_case::ParseUseCase;
             use crate::infra::{parser_factory::DefaultParserFactory, payload_store::CasPayloadStore, registry_adapter::JsonRegistry};
             use crate::pipeline::ingestion::ingest_log_reader::IngestLogReader;
-            use chrono::Utc;
-            use uuid::Uuid;
             
             println!("\n🚀 FULL PIPELINE: Processing {} from source to catalog", source_id);
             println!("{}", "=".repeat(60));
@@ -351,7 +348,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             // If it's a duplicate, we need to find the original payload
             let final_payload_ref = if payload_ref.is_empty() {
-                if let Some(original_id) = envelope_json.get("dedupe_of").and_then(|v| v.as_str()) {
+                if let Some(_original_id) = envelope_json.get("dedupe_of").and_then(|v| v.as_str()) {
                     println!("   ℹ️  Envelope is a duplicate, finding original payload...");
                     // For now, we'll need to search all log files to find the original
                     // This is a limitation that should be addressed in production
@@ -457,45 +454,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // STEP 6: CONFLATION
             println!("\n🔗 STEP 6: CONFLATION - Resolving entities...");
+            
+// Conflate directly using the DefaultConflator (use-case layer removed)
+use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
+            use crate::app::ports::ConflationOutputPort;
+            use crate::pipeline::processing::conflation::{DefaultConflator, Conflator};
+            
+            let conflation_output = Arc::new(ConflationOutputAdapter::new(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("output")
+            ));
+            let conflator = DefaultConflator::new();
+            
+            // Process enriched records through conflation with batch metrics
+            let batch_start = std::time::Instant::now();
+            let batch_size = enriched_records.len();
             let mut conflated_records = Vec::new();
+            let mut conflation_errors = 0;
             
             for enriched in enriched_records {
-                let entity_type = match &enriched.quality_assessed_record.normalized_record.entity {
-                    NormalizedEntity::Venue(_) => ConflationEntityType::Venue,
-                    NormalizedEntity::Event(_) => ConflationEntityType::Event,
-                    NormalizedEntity::Artist(_) => ConflationEntityType::Artist,
-                };
-                
-                let conflated = ConflatedRecord {
-                    canonical_entity_id: EntityId {
-                        id: Uuid::new_v4(),
-                        entity_type,
-                        version: 1,
-                    },
-                    enriched_record: enriched,
-                    conflation: ConflationMetadata {
-                        resolution_decision: ResolutionDecision::NewEntity,
-                        confidence: 0.95,
-                        strategy: "default".to_string(),
-                        alternatives: Vec::new(),
-                        previous_entity_id: None,
-                        contributing_sources: vec![source_id.clone()],
-                        similarity_scores: std::collections::HashMap::new(),
-                        warnings: Vec::new(),
-                        deduplication: DeduplicationMetadata {
-                            is_potential_duplicate: false,
-                            potential_duplicates: Vec::new(),
-                            deduplication_strategy: "none".to_string(),
-                            key_attributes: Vec::new(),
-                            deduplication_signature: None,
-                        },
-                    },
-                    conflated_at: Utc::now(),
-                };
-                conflated_records.push(conflated);
+                match conflator.conflate(&enriched) {
+                    Ok(conflated) => {
+                        // write via adapter for parity with previous behavior
+                        if let Err(e) = conflation_output.write_conflated_record(&conflated).await {
+                            warn!("Failed to write conflated record: {}", e);
+                        }
+                        conflated_records.push(conflated);
+                    }
+                    Err(e) => {
+                        warn!("Failed to conflate record: {}", e);
+                        conflation_errors += 1;
+                    }
+                }
             }
+            
+            // Record batch conflation metrics
+            let batch_duration = batch_start.elapsed().as_secs_f64();
+            let successful_count = conflated_records.len();
+            crate::observability::metrics::conflation::batch_processed(batch_size, successful_count, conflation_errors);
+            crate::observability::metrics::conflation::batch_processing_duration(batch_duration);
+            
             let conflated_count = conflated_records.len();
             println!("   ✅ Conflated {} records", conflated_count);
+            if conflation_errors > 0 {
+                println!("      - Errors: {}", conflation_errors);
+            }
 
             // STEP 7: CATALOG
             println!("\n📚 STEP 7: CATALOG - Creating canonical entities...");

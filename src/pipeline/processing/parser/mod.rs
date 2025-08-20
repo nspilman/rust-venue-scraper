@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+use crate::observability::metrics;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ParsedRecord {
@@ -11,6 +12,37 @@ pub struct ParsedRecord {
 
 pub trait Parser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>>;
+}
+
+/// A wrapper that adds metrics to any parser implementation
+pub struct MetricsParser<P: Parser> {
+    inner: P,
+}
+
+impl<P: Parser> MetricsParser<P> {
+    pub fn new(inner: P) -> Self {
+        Self { inner }
+    }
+}
+
+impl<P: Parser> Parser for MetricsParser<P> {
+    fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>> {
+        let start_time = std::time::Instant::now();
+        
+        match self.inner.parse(bytes) {
+            Ok(records) => {
+                metrics::parser::parse_success();
+                metrics::parser::records_extracted(records.len() as u64);
+                metrics::parser::duration(start_time.elapsed().as_secs_f64());
+                Ok(records)
+            }
+            Err(e) => {
+                metrics::parser::parse_error();
+                metrics::parser::duration(start_time.elapsed().as_secs_f64());
+                Err(e)
+            }
+        }
+    }
 }
 
 pub struct WixCalendarV1Parser {
@@ -33,6 +65,7 @@ impl Parser for WixCalendarV1Parser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>> {
         use tracing::{debug, info, warn};
         debug!("WixCalendarV1Parser: start bytes_len={}", bytes.len());
+        
         // The payload for Blue Moon is often a JSON with `eventsByDates` mapping; also support plain `events`.
         let v: serde_json::Value = serde_json::from_slice(bytes)?;
         let mut out = Vec::new();
@@ -325,12 +358,12 @@ impl Parser for KexpHtmlV1Parser {
         let document = Html::parse_document(&html);
         
         // KEXP events are in article.EventItem containers with h2 date headers
-        let event_selector = Selector::parse("article.EventItem").unwrap();
+        let _event_selector = Selector::parse("article.EventItem").unwrap();
         let title_selector = Selector::parse(".EventItem-body h3 a").unwrap();
         let time_selector = Selector::parse(".EventItem-DateTime h5").unwrap();
         let location_selector = Selector::parse(".EventItem-body .u-h3 a").unwrap();
         let description_selector = Selector::parse(".EventItem-description").unwrap();
-        let date_selector = Selector::parse("h2").unwrap();
+        let _date_selector = Selector::parse("h2").unwrap();
 
         let mut out = Vec::new();
         let mut current_date: Option<String> = None;
@@ -409,7 +442,6 @@ impl Parser for KexpHtmlV1Parser {
         } else {
             info!("KexpHtmlV1Parser: extracted events count={}", out.len());
         }
-        
         Ok(out)
     }
 }

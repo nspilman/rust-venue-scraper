@@ -146,7 +146,8 @@ impl EntityRegistry {
         self.handlers.len()
     }
 
-    /// Get the entity types of all registered handlers
+    /// Get the entity types of all registered handlers (tests only)
+    #[cfg(test)]
     pub fn registered_types(&self) -> Vec<&'static str> {
         self.handlers.iter().map(|h| h.entity_type()).collect()
     }

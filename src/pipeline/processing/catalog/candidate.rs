@@ -1,20 +1,12 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::domain::{Artist, Event, Venue};
-use crate::pipeline::processing::conflation::{ConflatedRecord, EntityId, EntityType};
+use crate::pipeline::processing::conflation::{EntityId, EntityType};
 
 /// Represents an entity that is a candidate for cataloging
 /// This is the intermediate stage between conflation and persistence
 #[derive(Debug, Clone)]
 pub struct CatalogCandidate {
-    /// The type of entity being cataloged
-    pub entity_type: EntityType,
-    
-    /// The canonical ID from conflation
-    pub canonical_id: EntityId,
-    
     /// The proposed state to persist
     pub proposed_state: ProposedEntity,
     
@@ -26,9 +18,6 @@ pub struct CatalogCandidate {
     
     /// Whether this should be persisted
     pub should_persist: bool,
-    
-    /// When this candidate was prepared
-    pub prepared_at: DateTime<Utc>,
 }
 
 /// The entity proposed for persistence
@@ -42,9 +31,9 @@ pub enum ProposedEntity {
 /// The current persisted state (if it exists)
 #[derive(Debug, Clone)]
 pub enum PersistedEntity {
-    Venue(Venue),
-    Event(Event),
-    Artist(Artist),
+    Venue,
+    Event,
+    Artist,
 }
 
 /// Describes what changes were detected
@@ -79,8 +68,8 @@ pub struct FieldChange {
 impl CatalogCandidate {
     /// Create a new candidate for a brand new entity
     pub fn new_entity(
-        entity_type: EntityType,
-        canonical_id: EntityId,
+        _entity_type: EntityType,
+        _canonical_id: EntityId,
         proposed: ProposedEntity,
     ) -> Self {
         let change_summary = match &proposed {
@@ -90,8 +79,6 @@ impl CatalogCandidate {
         };
 
         Self {
-            entity_type,
-            canonical_id,
             proposed_state: proposed,
             current_state: None,
             changes: ChangeSet {
@@ -101,26 +88,22 @@ impl CatalogCandidate {
                 change_summary,
             },
             should_persist: true,
-            prepared_at: Utc::now(),
         }
     }
 
     /// Create a candidate for an existing entity with potential updates
     pub fn existing_entity(
-        entity_type: EntityType,
-        canonical_id: EntityId,
+        _entity_type: EntityType,
+        _canonical_id: EntityId,
         proposed: ProposedEntity,
         current: PersistedEntity,
         changes: ChangeSet,
     ) -> Self {
         Self {
-            entity_type,
-            canonical_id,
             proposed_state: proposed,
             current_state: Some(current),
             changes: changes.clone(),
             should_persist: changes.has_changes,
-            prepared_at: Utc::now(),
         }
     }
 
@@ -132,15 +115,6 @@ impl CatalogCandidate {
     /// Check if this candidate has changes worth persisting
     pub fn has_changes(&self) -> bool {
         self.changes.has_changes
-    }
-
-    /// Get the entity ID to use for persistence
-    pub fn entity_id(&self) -> Option<Uuid> {
-        match &self.proposed_state {
-            ProposedEntity::Venue(v) => v.id,
-            ProposedEntity::Event(e) => e.id,
-            ProposedEntity::Artist(a) => a.id,
-        }
     }
 }
 

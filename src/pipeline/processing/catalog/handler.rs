@@ -6,7 +6,7 @@ use crate::domain::{ProcessRecord, ProcessRun};
 use crate::pipeline::processing::conflation::ConflatedRecord;
 use crate::pipeline::storage::Storage;
 
-use super::candidate::{CatalogCandidate, ChangeSet};
+use super::candidate::CatalogCandidate;
 
 /// Trait that defines how each entity type should be handled in the catalog
 /// Handlers own the transformation from ConflatedRecord to PersistedEntity

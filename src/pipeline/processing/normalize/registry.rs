@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use anyhow::Result;
 
-use super::normalizers::{SourceNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer, KexpNormalizer};
+use super::normalizers::{SourceNormalizer, MetricsNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer, KexpNormalizer};
+use crate::observability::metrics;
 use super::NormalizedRecord;
 use crate::pipeline::processing::parser::ParsedRecord;
 
@@ -15,20 +16,25 @@ impl NormalizationRegistry {
     pub fn new() -> Self {
         let mut normalizers: HashMap<String, Box<dyn SourceNormalizer>> = HashMap::new();
         
-        // Register all built-in source-specific normalizers
-        normalizers.insert("sea_monster".to_string(), Box::new(SeaMonsterNormalizer::new()));
-        normalizers.insert("darrells_tavern".to_string(), Box::new(DarrellsTavernNormalizer::new()));
-        normalizers.insert("blue_moon".to_string(), Box::new(BlueMoonNormalizer::new()));
-        normalizers.insert("kexp".to_string(), Box::new(KexpNormalizer::new()));
+        // Register all built-in source-specific normalizers with metrics
+        normalizers.insert("sea_monster".to_string(), 
+            Box::new(MetricsNormalizer::new(SeaMonsterNormalizer::new())));
+        normalizers.insert("darrells_tavern".to_string(), 
+            Box::new(MetricsNormalizer::new(DarrellsTavernNormalizer::new())));
+        normalizers.insert("blue_moon".to_string(), 
+            Box::new(MetricsNormalizer::new(BlueMoonNormalizer::new())));
+        normalizers.insert("kexp".to_string(), 
+            Box::new(MetricsNormalizer::new(KexpNormalizer::new())));
         
         Self {
             normalizers,
         }
     }
 
-    /// Register a normalizer for a specific source
-    pub fn register(&mut self, source_id: String, normalizer: Box<dyn SourceNormalizer>) {
-        self.normalizers.insert(source_id, normalizer);
+    /// Test-only: list registered source IDs
+    #[cfg(test)]
+    pub fn list_sources(&self) -> Vec<&str> {
+        self.normalizers.keys().map(|k| k.as_str()).collect()
     }
 
     /// Get the appropriate normalizer for a source
@@ -40,17 +46,17 @@ impl NormalizationRegistry {
 
     /// Normalize a record using the appropriate source-specific normalizer
     pub fn normalize(&self, record: &ParsedRecord) -> Result<Vec<NormalizedRecord>> {
+        // Record batch processing metrics
+        metrics::normalize::batch_processed(1);
+        
         if let Some(normalizer) = self.get_normalizer(&record.source_id) {
             normalizer.normalize(record)
         } else {
+            metrics::normalize::warning_logged(&format!("no_normalizer_for_source_{}", record.source_id));
             Err(anyhow::anyhow!("No normalizer registered for source: {}", record.source_id))
         }
     }
     
-    /// List all registered source IDs
-    pub fn list_sources(&self) -> Vec<&str> {
-        self.normalizers.keys().map(|k| k.as_str()).collect()
-    }
 }
 
 #[cfg(test)]

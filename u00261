@@ -1,0 +1,761 @@
+   Compiling sms_scraper v0.1.0 (/Users/natespilman/Repos/rust-venue-scraper-clean)
+warning: struct `EntityMapper` is never constructed
+ --> src/pipeline/processing/catalog/mapper.rs:9:12
+  |
+9 | pub struct EntityMapper;
+  |            ^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` on by default
+
+warning: associated functions `map_to_venue`, `map_to_event`, `map_to_artist`, and `extract_entity` are never used
+  --> src/pipeline/processing/catalog/mapper.rs:13:12
+   |
+11 | impl EntityMapper {
+   | ----------------- associated functions in this implementation
+12 |     /// Build a Venue from a conflated record
+13 |     pub fn map_to_venue(conflated_record: &ConflatedRecord) -> Result<Venue> {
+   |            ^^^^^^^^^^^^
+...
+38 |     pub fn map_to_event(
+   |            ^^^^^^^^^^^^
+...
+77 |     pub fn map_to_artist(conflated_record: &ConflatedRecord) -> Result<Artist> {
+   |            ^^^^^^^^^^^^^
+...
+92 |     pub fn extract_entity(conflated_record: &ConflatedRecord) -> &NormalizedEntity {
+   |            ^^^^^^^^^^^^^^
+
+warning: struct `EntityUtils` is never constructed
+  --> src/pipeline/processing/catalog/mapper.rs:98:12
+   |
+98 | pub struct EntityUtils;
+   |            ^^^^^^^^^^^
+
+warning: associated function `generate_slug` is never used
+   --> src/pipeline/processing/catalog/mapper.rs:102:12
+    |
+100 | impl EntityUtils {
+    | ---------------- associated function in this implementation
+101 |     /// Generate a URL-friendly slug from a name
+102 |     pub fn generate_slug(name: &str) -> String {
+    |            ^^^^^^^^^^^^^
+
+warning: struct `IdempotencyChecker` is never constructed
+ --> src/pipeline/processing/catalog/idempotency.rs:4:12
+  |
+4 | pub struct IdempotencyChecker;
+  |            ^^^^^^^^^^^^^^^^^^
+
+warning: associated functions `event_has_changes`, `venue_has_changes`, and `artist_has_changes` are never used
+  --> src/pipeline/processing/catalog/idempotency.rs:8:12
+   |
+6  | impl IdempotencyChecker {
+   | ----------------------- associated functions in this implementation
+7  |     /// Check if an event has changes compared to stored version
+8  |     pub fn event_has_changes(existing: &Event, updated: &Event) -> bool {
+   |            ^^^^^^^^^^^^^^^^^
+...
+18 |     pub fn venue_has_changes(existing: &Venue, updated: &Venue) -> bool {
+   |            ^^^^^^^^^^^^^^^^^
+...
+32 |     pub fn artist_has_changes(existing: &Artist, updated: &Artist) -> bool {
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `ProvenanceTracker` is never constructed
+  --> src/pipeline/processing/catalog/provenance.rs:10:12
+   |
+10 | pub struct ProvenanceTracker {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src/pipeline/processing/catalog/provenance.rs:17:12
+    |
+15  | impl ProvenanceTracker {
+    | ---------------------- associated items in this implementation
+16  |     /// Create a new ProvenanceTracker
+17  |     pub fn new(storage: Arc<dyn Storage>, process_run_id: Option<Uuid>) -> Self {
+    |            ^^^
+...
+25  |     pub fn set_process_run_id(&mut self, run_id: Option<Uuid>) {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+30  |     pub async fn emit_record(
+    |                  ^^^^^^^^^^^
+...
+61  |     pub async fn venue_created(&self, venue_name: &str, venue_id: Option<Uuid>) -> Result<()> {
+    |                  ^^^^^^^^^^^^^
+...
+73  |     pub async fn venue_matched(&self, venue_name: &str, venue_id: Uuid) -> Result<()> {
+    |                  ^^^^^^^^^^^^^
+...
+85  |     pub async fn venue_duplicate(&self, venue_name: &str, venue_id: Uuid) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^
+...
+97  |     pub async fn venue_uncertain(&self, venue_name: &str) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^
+...
+109 |     pub async fn event_created(&self, event_title: &str, event_id: Option<Uuid>) -> Result<()> {
+    |                  ^^^^^^^^^^^^^
+...
+121 |     pub async fn event_updated(&self, event_title: &str, event_id: Option<Uuid>) -> Result<()> {
+    |                  ^^^^^^^^^^^^^
+...
+133 |     pub async fn event_duplicate(&self, event_title: &str, event_id: Uuid) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^
+...
+145 |     pub async fn event_uncertain(&self, event_title: &str) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^
+...
+157 |     pub async fn artist_created(&self, artist_name: &str, artist_id: Option<Uuid>) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^
+...
+169 |     pub async fn artist_matched(&self, artist_name: &str, artist_id: Uuid) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^
+...
+181 |     pub async fn artist_uncertain(&self, artist_name: &str) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^^
+
+warning: methods `extract_artist`, `artist_has_changes`, and `create_artist_created_record` are never used
+  --> src/pipeline/processing/catalog/handlers/artist.rs:24:8
+   |
+18 | impl ArtistHandler {
+   | ------------------ methods in this implementation
+...
+24 |     fn extract_artist(&self, record: &ConflatedRecord) -> Option<Artist> {
+   |        ^^^^^^^^^^^^^^
+...
+35 |     fn artist_has_changes(&self, new_artist: &Artist, existing_artist: &Artist) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^
+...
+44 |     fn create_artist_created_record(
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `extract_event` and `event_has_changes` are never used
+  --> src/pipeline/processing/catalog/handlers/event.rs:24:8
+   |
+18 | impl EventHandler {
+   | ----------------- methods in this implementation
+...
+24 |     fn extract_event(&self, record: &ConflatedRecord) -> Option<Event> {
+   |        ^^^^^^^^^^^^^
+...
+35 |     fn event_has_changes(&self, new_event: &Event, existing_event: &Event) -> bool {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: method `create_slug` is never used
+  --> src/pipeline/processing/catalog/handlers/venue.rs:58:8
+   |
+18 | impl VenueHandler {
+   | ----------------- method in this implementation
+...
+58 |     fn create_slug(&self, name: &str) -> String {
+   |        ^^^^^^^^^^^
+
+warning: `sms_scraper` (lib) generated 11 warnings
+warning: multiple variants are never constructed
+   --> src/observability/metrics.rs:82:5
+    |
+13  | pub enum MetricName {
+    |          ---------- variants in this enum
+...
+82  |     ConflationRecordsProcessed,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+83  |     ConflationRecordsSuccessful,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+84  |     ConflationRecordsFailed,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+85  |     ConflationConfidenceScore,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+86  |     ConflationNewEntities,
+    |     ^^^^^^^^^^^^^^^^^^^^^
+87  |     ConflationMatchedExisting,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+88  |     ConflationUpdatedExisting,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+89  |     ConflationDuplicates,
+    |     ^^^^^^^^^^^^^^^^^^^^
+90  |     ConflationUncertainResolutions,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+91  |     ConflationWarnings,
+    |     ^^^^^^^^^^^^^^^^^^
+92  |     ConflationPotentialDuplicates,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+93  |     ConflationAlternativeMatches,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+94  |     ConflationOutputFailed,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+95  |     ConflationProcessingDuration,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96  |     ConflationBatchesProcessed,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+97  |     ConflationBatchesSuccessful,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+98  |     ConflationBatchSize,
+    |     ^^^^^^^^^^^^^^^^^^^
+99  |     ConflationBatchProcessingDuration,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+100 |     ConflationBatchRecordsSuccessful,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+101 |     ConflationBatchRecordsFailed,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `MetricName` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `emit_counter` is never used
+   --> src/observability/metrics.rs:667:8
+    |
+667 | pub fn emit_counter(metric_name: MetricName, value: f64) {
+    |        ^^^^^^^^^^^^
+
+warning: function `emit_histogram` is never used
+   --> src/observability/metrics.rs:676:8
+    |
+676 | pub fn emit_histogram(metric_name: MetricName, value: f64) {
+    |        ^^^^^^^^^^^^^^
+
+warning: function `emit_gauge` is never used
+   --> src/observability/metrics.rs:683:8
+    |
+683 | pub fn emit_gauge(metric_name: MetricName, value: f64) {
+    |        ^^^^^^^^^^
+
+warning: function `batch_processed` is never used
+    --> src/observability/metrics.rs:1282:12
+     |
+1282 |     pub fn batch_processed(batch_size: usize) {
+     |            ^^^^^^^^^^^^^^^
+
+warning: function `records_processed` is never used
+    --> src/observability/metrics.rs:1305:12
+     |
+1305 |     pub fn records_processed() {
+     |            ^^^^^^^^^^^^^^^^^
+
+warning: function `records_successful` is never used
+    --> src/observability/metrics.rs:1314:12
+     |
+1314 |     pub fn records_successful() {
+     |            ^^^^^^^^^^^^^^^^^^
+
+warning: function `records_failed` is never used
+    --> src/observability/metrics.rs:1323:12
+     |
+1323 |     pub fn records_failed() {
+     |            ^^^^^^^^^^^^^^
+
+warning: function `confidence_score_recorded` is never used
+    --> src/observability/metrics.rs:1332:12
+     |
+1332 |     pub fn confidence_score_recorded(confidence: f64) {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `new_entity_created` is never used
+    --> src/observability/metrics.rs:1339:12
+     |
+1339 |     pub fn new_entity_created() {
+     |            ^^^^^^^^^^^^^^^^^^
+
+warning: function `matched_existing` is never used
+    --> src/observability/metrics.rs:1348:12
+     |
+1348 |     pub fn matched_existing() {
+     |            ^^^^^^^^^^^^^^^^
+
+warning: function `updated_existing` is never used
+    --> src/observability/metrics.rs:1357:12
+     |
+1357 |     pub fn updated_existing() {
+     |            ^^^^^^^^^^^^^^^^
+
+warning: function `duplicate_detected` is never used
+    --> src/observability/metrics.rs:1366:12
+     |
+1366 |     pub fn duplicate_detected() {
+     |            ^^^^^^^^^^^^^^^^^^
+
+warning: function `uncertain_resolution` is never used
+    --> src/observability/metrics.rs:1375:12
+     |
+1375 |     pub fn uncertain_resolution() {
+     |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `warning_logged` is never used
+    --> src/observability/metrics.rs:1384:12
+     |
+1384 |     pub fn warning_logged(warning: &str) {
+     |            ^^^^^^^^^^^^^^
+
+warning: function `potential_duplicates` is never used
+    --> src/observability/metrics.rs:1393:12
+     |
+1393 |     pub fn potential_duplicates(count: usize) {
+     |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `alternative_matches` is never used
+    --> src/observability/metrics.rs:1403:12
+     |
+1403 |     pub fn alternative_matches(count: usize) {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: function `output_failed` is never used
+    --> src/observability/metrics.rs:1413:12
+     |
+1413 |     pub fn output_failed() {
+     |            ^^^^^^^^^^^^^
+
+warning: function `processing_duration` is never used
+    --> src/observability/metrics.rs:1422:12
+     |
+1422 |     pub fn processing_duration(duration_seconds: f64) {
+     |            ^^^^^^^^^^^^^^^^^^^
+
+warning: function `batch_processed` is never used
+    --> src/observability/metrics.rs:1429:12
+     |
+1429 |     pub fn batch_processed(batch_size: usize, successful_count: usize, failed_count: usize) {
+     |            ^^^^^^^^^^^^^^^
+
+warning: function `batch_processing_duration` is never used
+    --> src/observability/metrics.rs:1462:12
+     |
+1462 |     pub fn batch_processing_duration(duration_seconds: f64) {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `reset` is never used
+   --> src/pipeline/processing/normalize/normalizers/base.rs:107:12
+    |
+83  | impl VenueStateManager {
+    | ---------------------- method in this implementation
+...
+107 |     pub fn reset(&self) {
+    |            ^^^^^
+
+warning: method `reset` is never used
+   --> src/pipeline/processing/normalize/normalizers/base.rs:145:12
+    |
+120 | impl ArtistStateManager {
+    | ----------------------- method in this implementation
+...
+145 |     pub fn reset(&self) {
+    |            ^^^^^
+
+warning: methods `register` and `list_sources` are never used
+  --> src/pipeline/processing/normalize/registry.rs:35:12
+   |
+14 | impl NormalizationRegistry {
+   | -------------------------- methods in this implementation
+...
+35 |     pub fn register(&mut self, source_id: String, normalizer: Box<dyn SourceNormalizer>) {
+   |            ^^^^^^^^
+...
+60 |     pub fn list_sources(&self) -> Vec<&str> {
+   |            ^^^^^^^^^^^^
+
+warning: associated function `with_config` is never used
+   --> src/pipeline/processing/quality_gate/mod.rs:194:12
+    |
+185 | impl DefaultQualityGate {
+    | ----------------------- associated function in this implementation
+...
+194 |     pub fn with_config(config: QualityGateConfig) -> Self {
+    |            ^^^^^^^^^^^
+
+warning: associated function `new` is never used
+  --> src/pipeline/processing/enrich.rs:99:12
+   |
+98 | impl<E: Enricher> MetricsEnricher<E> {
+   | ------------------------------------ associated function in this implementation
+99 |     pub fn new(inner: E) -> Self {
+   |            ^^^
+
+warning: associated function `with_city_center` is never used
+   --> src/pipeline/processing/enrich.rs:178:12
+    |
+171 | impl DefaultEnricher {
+    | -------------------- associated function in this implementation
+...
+178 |     pub fn with_city_center(lat: f64, lng: f64) -> Self {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: fields `enabled_strategies` and `text_similarity_threshold` are never read
+   --> src/pipeline/processing/conflation.rs:110:9
+    |
+106 | pub struct ConflationConfig {
+    |            ---------------- fields in this struct
+...
+110 |     pub enabled_strategies: Vec<MatchingStrategy>,
+    |         ^^^^^^^^^^^^^^^^^^
+...
+116 |     pub text_similarity_threshold: f64,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `ConflationConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: method `conflate` is never used
+   --> src/pipeline/processing/conflation.rs:137:8
+    |
+135 | pub trait Conflator {
+    |           --------- method in this trait
+136 |     /// Conflate an enriched record, resolving it to a canonical entity
+137 |     fn conflate(&self, record: &EnrichedRecord) -> anyhow::Result<ConflatedRecord>;
+    |        ^^^^^^^^
+
+warning: fields `similarity_breakdown` and `matched_record` are never read
+   --> src/pipeline/processing/conflation.rs:154:9
+    |
+148 | pub struct PotentialMatch {
+    |            -------------- fields in this struct
+...
+154 |     pub similarity_breakdown: HashMap<String, f64>,
+    |         ^^^^^^^^^^^^^^^^^^^^
+155 |     /// The enriched record of the potential match
+156 |     pub matched_record: EnrichedRecord,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `PotentialMatch` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `new`, `with_config`, and `add_canonical_entity` are never used
+   --> src/pipeline/processing/conflation.rs:195:12
+    |
+193 | impl DefaultConflator {
+    | --------------------- associated items in this implementation
+194 |     /// Create a new conflator with default configuration
+195 |     pub fn new() -> Self {
+    |            ^^^
+...
+200 |     pub fn with_config(config: ConflationConfig) -> Self {
+    |            ^^^^^^^^^^^
+...
+210 |     pub fn add_canonical_entity(&mut self, conflated_record: ConflatedRecord) {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `EntityMapper` is never constructed
+ --> src/pipeline/processing/catalog/mapper.rs:9:12
+  |
+9 | pub struct EntityMapper;
+  |            ^^^^^^^^^^^^
+
+warning: fields `entity_type`, `canonical_id`, and `prepared_at` are never read
+  --> src/pipeline/processing/catalog/candidate.rs:13:9
+   |
+11 | pub struct CatalogCandidate {
+   |            ---------------- fields in this struct
+12 |     /// The type of entity being cataloged
+13 |     pub entity_type: EntityType,
+   |         ^^^^^^^^^^^
+...
+16 |     pub canonical_id: EntityId,
+   |         ^^^^^^^^^^^^
+...
+31 |     pub prepared_at: DateTime<Utc>,
+   |         ^^^^^^^^^^^
+   |
+   = note: `CatalogCandidate` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `0` is never read
+  --> src/pipeline/processing/catalog/candidate.rs:45:11
+   |
+45 |     Venue(Venue),
+   |     ----- ^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `PersistedEntity` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+45 -     Venue(Venue),
+45 +     Venue(()),
+   |
+
+warning: field `0` is never read
+  --> src/pipeline/processing/catalog/candidate.rs:46:11
+   |
+46 |     Event(Event),
+   |     ----- ^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `PersistedEntity` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+46 -     Event(Event),
+46 +     Event(()),
+   |
+
+warning: field `0` is never read
+  --> src/pipeline/processing/catalog/candidate.rs:47:12
+   |
+47 |     Artist(Artist),
+   |     ------ ^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `PersistedEntity` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+47 -     Artist(Artist),
+47 +     Artist(()),
+   |
+
+warning: method `entity_id` is never used
+   --> src/pipeline/processing/catalog/candidate.rs:138:12
+    |
+79  | impl CatalogCandidate {
+    | --------------------- method in this implementation
+...
+138 |     pub fn entity_id(&self) -> Option<Uuid> {
+    |            ^^^^^^^^^
+
+warning: associated items `with_registry` and `supported_entity_types` are never used
+   --> src/pipeline/processing/catalog/catalogger.rs:41:12
+    |
+21  | impl Catalogger {
+    | --------------- associated items in this implementation
+...
+41  |     pub fn with_registry(storage: Arc<dyn Storage>, registry: EntityRegistry) -> Self {
+    |            ^^^^^^^^^^^^^
+...
+133 |     pub fn supported_entity_types(&self) -> Vec<&'static str> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `registered_types` is never used
+   --> src/pipeline/processing/catalog/registry.rs:150:12
+    |
+38  | impl EntityRegistry {
+    | ------------------- method in this implementation
+...
+150 |     pub fn registered_types(&self) -> Vec<&'static str> {
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `write_enriched_record` is never used
+  --> src/app/ports.rs:67:14
+   |
+66 | pub trait EnrichOutputPort: Send + Sync {
+   |           ---------------- method in this trait
+67 |     async fn write_enriched_record(&self, record: &crate::pipeline::processing::enrich::EnrichedRecord) -> anyhow::Result<()>;
+   |              ^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `write_conflated_record` is never used
+  --> src/app/ports.rs:72:14
+   |
+71 | pub trait ConflationOutputPort: Send + Sync {
+   |           -------------------- method in this trait
+72 |     async fn write_conflated_record(&self, record: &crate::pipeline::processing::conflation::ConflatedRecord) -> anyhow::Result<()>;
+   |              ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated functions `new` and `get_batch_stats` are never used
+  --> src/app/quality_gate_use_case.rs:15:12
+   |
+14 | impl QualityGateUseCase {
+   | ----------------------- associated functions in this implementation
+15 |     pub fn new(
+   |            ^^^
+...
+85 |     pub fn get_batch_stats(assessed_records: &[QualityAssessedRecord]) -> QualityGateBatchStats {
+   |            ^^^^^^^^^^^^^^^
+
+warning: multiple fields are never read
+   --> src/app/quality_gate_use_case.rs:129:9
+    |
+128 | pub struct QualityGateBatchStats {
+    |            --------------------- fields in this struct
+129 |     pub total_records: usize,
+    |         ^^^^^^^^^^^^^
+130 |     pub accepted_count: usize,
+    |         ^^^^^^^^^^^^^^
+131 |     pub accepted_with_warnings_count: usize,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+132 |     pub quarantined_count: usize,
+    |         ^^^^^^^^^^^^^^^^^
+133 |     pub min_quality_score: Option<f64>,
+    |         ^^^^^^^^^^^^^^^^^
+134 |     pub max_quality_score: Option<f64>,
+    |         ^^^^^^^^^^^^^^^^^
+135 |     pub avg_quality_score: f64,
+    |         ^^^^^^^^^^^^^^^^^
+136 |     pub info_issues: usize,
+    |         ^^^^^^^^^^^
+137 |     pub warning_issues: usize,
+    |         ^^^^^^^^^^^^^^
+138 |     pub error_issues: usize,
+    |         ^^^^^^^^^^^^
+139 |     pub critical_issues: usize,
+    |         ^^^^^^^^^^^^^^^
+    |
+    = note: `QualityGateBatchStats` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: methods `acceptance_rate` and `quarantine_rate` are never used
+   --> src/app/quality_gate_use_case.rs:144:12
+    |
+142 | impl QualityGateBatchStats {
+    | -------------------------- methods in this implementation
+143 |     /// Calculate acceptance rate as percentage
+144 |     pub fn acceptance_rate(&self) -> f64 {
+    |            ^^^^^^^^^^^^^^^
+...
+152 |     pub fn quarantine_rate(&self) -> f64 {
+    |            ^^^^^^^^^^^^^^^
+
+warning: struct `EnrichUseCase` is never constructed
+ --> src/app/enrich_use_case.rs:8:12
+  |
+8 | pub struct EnrichUseCase {
+  |            ^^^^^^^^^^^^^
+
+warning: associated items `new`, `with_default_enricher`, `enrich_record`, `enrich_batch`, and `get_batch_stats` are never used
+  --> src/app/enrich_use_case.rs:14:12
+   |
+13 | impl EnrichUseCase {
+   | ------------------ associated items in this implementation
+14 |     pub fn new(
+   |            ^^^
+...
+25 |     pub fn with_default_enricher(output: Box<dyn EnrichOutputPort>) -> Self {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+...
+33 |     pub async fn enrich_record(&self, record: &QualityAssessedRecord) -> Result<EnrichedRecord> {
+   |                  ^^^^^^^^^^^^^
+...
+44 |     pub async fn enrich_batch(&self, records: &[QualityAssessedRecord]) -> Result<Vec<EnrichedRecord>> {
+   |                  ^^^^^^^^^^^^
+...
+57 |     pub fn get_batch_stats(enriched_records: &[EnrichedRecord]) -> EnrichBatchStats {
+   |            ^^^^^^^^^^^^^^^
+
+warning: multiple fields are never read
+   --> src/app/enrich_use_case.rs:113:9
+    |
+112 | pub struct EnrichBatchStats {
+    |            ---------------- fields in this struct
+113 |     pub total_records: usize,
+    |         ^^^^^^^^^^^^^
+114 |     pub spatially_binned: usize,
+    |         ^^^^^^^^^^^^^^^^
+115 |     pub city_identified: usize,
+    |         ^^^^^^^^^^^^^^^
+116 |     pub with_coordinates: usize,
+    |         ^^^^^^^^^^^^^^^^
+117 |     pub total_tags: usize,
+    |         ^^^^^^^^^^
+118 |     pub total_warnings: usize,
+    |         ^^^^^^^^^^^^^^
+119 |     pub min_confidence: Option<f64>,
+    |         ^^^^^^^^^^^^^^
+120 |     pub max_confidence: Option<f64>,
+    |         ^^^^^^^^^^^^^^
+121 |     pub avg_confidence: f64,
+    |         ^^^^^^^^^^^^^^
+122 |     pub avg_tags_per_record: f64,
+    |         ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `EnrichBatchStats` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: methods `spatial_binning_rate`, `city_identification_rate`, and `coordinate_availability_rate` are never used
+   --> src/app/enrich_use_case.rs:127:12
+    |
+125 | impl EnrichBatchStats {
+    | --------------------- methods in this implementation
+126 |     /// Calculate spatial binning rate as percentage
+127 |     pub fn spatial_binning_rate(&self) -> f64 {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+135 |     pub fn city_identification_rate(&self) -> f64 {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+143 |     pub fn coordinate_availability_rate(&self) -> f64 {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ConflationUseCase` is never constructed
+  --> src/app/conflation_use_case.rs:11:12
+   |
+11 | pub struct ConflationUseCase {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src/app/conflation_use_case.rs:20:12
+    |
+18  | impl ConflationUseCase {
+    | ---------------------- associated items in this implementation
+19  |     /// Create a new conflation use case with default conflator
+20  |     pub fn new(output_port: Arc<dyn ConflationOutputPort>) -> Self {
+    |            ^^^
+...
+28  |     pub fn with_conflator(
+    |            ^^^^^^^^^^^^^^
+...
+39  |     pub async fn conflate_record(&self, record: &EnrichedRecord) -> Result<ConflatedRecord> {
+    |                  ^^^^^^^^^^^^^^^
+...
+125 |     pub async fn conflate_batch(&self, records: &[EnrichedRecord]) -> Result<Vec<ConflatedRecord>> {
+    |                  ^^^^^^^^^^^^^^
+...
+175 |     pub fn get_conflation_stats(&self) -> ConflationStats {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+189 |     fn emit_resolution_metrics(&self, conflated_record: &ConflatedRecord, entity_type: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+215 |     fn determine_entity_type_string(&self, record: &EnrichedRecord) -> String {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ConflationStats` is never constructed
+   --> src/app/conflation_use_case.rs:228:12
+    |
+228 | pub struct ConflationStats {
+    |            ^^^^^^^^^^^^^^^
+    |
+    = note: `ConflationStats` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `file_path` is never read
+  --> src/infra/quality_gate_output_adapter.rs:13:5
+   |
+11 | pub struct FileQualityGateOutputAdapter {
+   |            ---------------------------- field in this struct
+12 |     file_writer: Mutex<BufWriter<std::fs::File>>,
+13 |     file_path: String,
+   |     ^^^^^^^^^
+
+warning: method `file_path` is never used
+  --> src/infra/quality_gate_output_adapter.rs:38:12
+   |
+16 | impl FileQualityGateOutputAdapter {
+   | --------------------------------- method in this implementation
+...
+38 |     pub fn file_path(&self) -> &str {
+   |            ^^^^^^^^^
+
+warning: field `file_path` is never read
+  --> src/infra/enrich_output_adapter.rs:13:5
+   |
+11 | pub struct FileEnrichOutputAdapter {
+   |            ----------------------- field in this struct
+12 |     file_writer: Mutex<BufWriter<std::fs::File>>,
+13 |     file_path: String,
+   |     ^^^^^^^^^
+
+warning: associated items `new` and `file_path` are never used
+  --> src/infra/enrich_output_adapter.rs:17:12
+   |
+16 | impl FileEnrichOutputAdapter {
+   | ---------------------------- associated items in this implementation
+17 |     pub fn new(file_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+   |            ^^^
+...
+38 |     pub fn file_path(&self) -> &str {
+   |            ^^^^^^^^^
+
+warning: associated functions `new` and `with_partitioning` are never used
+  --> src/infra/conflation_output_adapter.rs:22:12
+   |
+20 | impl ConflationOutputAdapter {
+   | ---------------------------- associated functions in this implementation
+21 |     /// Create a new conflation output adapter
+22 |     pub fn new(output_dir: PathBuf) -> Self {
+   |            ^^^
+...
+30 |     pub fn with_partitioning(output_dir: PathBuf, use_date_partitioning: bool) -> Self {
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: `sms_scraper` (bin "sms_scraper") generated 66 warnings (10 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.05s

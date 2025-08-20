@@ -8,4 +8,3 @@ pub mod conflation;
 pub mod catalog;
 
 // Re-export key types and functions
-pub use catalog::Catalogger;

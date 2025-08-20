@@ -8,4 +8,3 @@ pub mod pipeline;
 pub mod tasks;
 
 // Re-export key types and functions from each stage
-pub use processing::parser;

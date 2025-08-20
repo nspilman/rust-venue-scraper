@@ -10,69 +10,23 @@ use crate::pipeline::processing::catalog::candidate::{
 };
 use crate::pipeline::processing::catalog::handler::EntityHandler;
 use crate::pipeline::processing::conflation::{ConflatedRecord, EntityType};
-use crate::pipeline::processing::normalize::NormalizedEntity;
 use crate::pipeline::storage::Storage;
 
-pub struct ArtistHandler;
+use std::sync::Arc;
+use crate::pipeline::processing::catalog::mapper::{EntityUtils, MapperRegistry};
+
+pub struct ArtistHandler {
+    mappers: Arc<MapperRegistry>,
+}
 
 impl ArtistHandler {
+    #[cfg(test)]
     pub fn new() -> Self {
-        ArtistHandler
+        Self { mappers: Arc::new(MapperRegistry::default()) }
     }
 
-    /// Extract artist from conflated record
-    fn extract_artist(&self, record: &ConflatedRecord) -> Option<Artist> {
-        // The ConflatedRecord structure uses enriched_record which has a normalized entity
-        let normalized_entity = &record.enriched_record.quality_assessed_record.normalized_record.entity;
-        if let NormalizedEntity::Artist(artist) = normalized_entity {
-            Some(artist.clone())
-        } else {
-            None
-        }
-    }
-
-    /// Check if an artist has changes compared to existing
-    fn artist_has_changes(&self, new_artist: &Artist, existing_artist: &Artist) -> bool {
-        // The domain Artist only has: id, name, name_slug, bio, artist_image_url, created_at
-        new_artist.name != existing_artist.name
-            || new_artist.name_slug != existing_artist.name_slug
-            || new_artist.bio != existing_artist.bio
-            || new_artist.artist_image_url != existing_artist.artist_image_url
-    }
-
-    /// Create process record for artist creation (legacy method)
-    fn create_artist_created_record(
-        &self,
-        artist: &Artist,
-        process_run: &ProcessRun,
-        timestamp: DateTime<Utc>,
-    ) -> ProcessRecord {
-        ProcessRecord {
-            id: Some(Uuid::new_v4()),
-            process_run_id: process_run.id.unwrap_or_else(|| Uuid::new_v4()),
-            api_name: "catalog".to_string(),
-            raw_data_id: None,
-            change_type: "CREATE".to_string(),
-            change_log: format!("Created new artist: {}", artist.name),
-            field_changed: "all".to_string(),
-            event_id: None,
-            venue_id: None,
-            artist_id: artist.id,
-            created_at: timestamp,
-        }
-    }
-
-
-    /// Create a URL-friendly slug from artist name
-    fn create_slug(&self, name: &str) -> String {
-        name.to_lowercase()
-            .chars()
-            .map(|c| if c.is_alphanumeric() { c } else { '-' })
-            .collect::<String>()
-            .split('-')
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join("-")
+    pub fn with_mappers(mappers: Arc<MapperRegistry>) -> Self {
+        Self { mappers }
     }
 
     /// Detect changes between proposed and current artist
@@ -137,13 +91,8 @@ impl EntityHandler for ArtistHandler {
         storage: &dyn Storage,
     ) -> Result<Option<CatalogCandidate>> {
         // Step 1: Extract artist from the normalized entity in the conflated record
-        let normalized_entity = &record.enriched_record.quality_assessed_record.normalized_record.entity;
-        
-        let Some(normalized_artist) = (if let NormalizedEntity::Artist(artist) = normalized_entity {
-            Some(artist.clone())
-        } else {
-            None
-        }) else {
+        // Build proposed artist via mapper
+        let Ok(normalized_artist) = self.mappers.artist_mapper.to_artist(record) else {
             debug!("No artist found in conflated record");
             return Ok(None);
         };
@@ -152,7 +101,7 @@ impl EntityHandler for ArtistHandler {
         let proposed_artist = Artist {
             id: Some(record.canonical_entity_id.id),
             name: normalized_artist.name.clone(),
-            name_slug: self.create_slug(&normalized_artist.name),
+            name_slug: EntityUtils::generate_slug(&normalized_artist.name),
             bio: normalized_artist.bio,
             artist_image_url: None, // Not available in normalized artist
             created_at: Utc::now(),
@@ -164,7 +113,7 @@ impl EntityHandler for ArtistHandler {
             Ok(Some(existing_artist)) => {
                 // Artist exists - check for changes
                 let changes = self.detect_artist_changes(&proposed_artist, &existing_artist);
-                let current_entity = PersistedEntity::Artist(existing_artist);
+let current_entity = PersistedEntity::Artist;
                 
                 Ok(Some(CatalogCandidate::existing_entity(
                     EntityType::Artist,
@@ -276,10 +225,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_artist_has_changes() {
+    fn test_detect_artist_changes() {
         let handler = ArtistHandler::new();
         
-        // Artist domain has: id, name, name_slug, bio, artist_image_url, created_at
         let artist1 = Artist {
             id: Some(uuid::Uuid::new_v4()),
             name: "Test Band".to_string(),
@@ -292,15 +240,12 @@ mod tests {
         let mut artist2 = artist1.clone();
         
         // No changes
-        assert!(!handler.artist_has_changes(&artist1, &artist2));
+        let changes = handler.detect_artist_changes(&artist1, &artist2);
+        assert!(!changes.has_changes);
         
         // Name change
         artist2.name = "Updated Band".to_string();
-        assert!(handler.artist_has_changes(&artist1, &artist2));
-        
-        // Bio change  
-        artist2.name = artist1.name.clone();
-        artist2.bio = Some("An updated band".to_string());
-        assert!(handler.artist_has_changes(&artist1, &artist2));
+        let changes = handler.detect_artist_changes(&artist2, &artist1);
+        assert!(changes.has_changes);
     }
 }

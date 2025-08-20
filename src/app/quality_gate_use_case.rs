@@ -1,8 +1,3 @@
-use anyhow::Result;
-
-use crate::app::ports::QualityGateOutputPort;
-use crate::pipeline::processing::normalize::NormalizedRecord;
-use crate::pipeline::processing::quality_gate::{DefaultQualityGate, QualityAssessedRecord, QualityGate, QualityDecision};
 
 /// Use case for assessing quality of normalized records through the Quality Gate
 pub struct QualityGateUseCase {
@@ -30,7 +25,7 @@ impl QualityGateUseCase {
         quarantined_output: Box<dyn QualityGateOutputPort>,
     ) -> Self {
         Self {
-            quality_gate: Box::new(DefaultQualityGate::new()),
+            quality_gate: Box::new(MetricsQualityGate::new(DefaultQualityGate::new())),
             accepted_output,
             quarantined_output,
         }
@@ -38,34 +33,8 @@ impl QualityGateUseCase {
 
     /// Assess quality of a single normalized record
     pub async fn assess_record(&self, record: &NormalizedRecord) -> Result<QualityAssessedRecord> {
-        // Apply quality assessment logic
+        // Apply quality assessment logic (metrics are handled by MetricsQualityGate wrapper)
         let assessed_record = self.quality_gate.assess(record)?;
-
-        // Emit metrics for quality assessment
-        match assessed_record.quality_assessment.decision {
-            QualityDecision::Accept => {
-                crate::observability::metrics::quality_gate::record_accepted();
-            }
-            QualityDecision::AcceptWithWarnings => {
-                crate::observability::metrics::quality_gate::record_accepted_with_warnings();
-            }
-            QualityDecision::Quarantine => {
-                crate::observability::metrics::quality_gate::record_quarantined();
-            }
-        }
-
-        // Record quality score
-        crate::observability::metrics::quality_gate::quality_score_recorded(
-            assessed_record.quality_assessment.quality_score
-        );
-
-        // Record issues by type and severity
-        for issue in &assessed_record.quality_assessment.issues {
-            crate::observability::metrics::quality_gate::issue_detected(
-                &format!("{:?}", issue.issue_type),
-                &format!("{:?}", issue.severity)
-            );
-        }
 
         // Route to appropriate output based on decision
         match assessed_record.quality_assessment.decision {

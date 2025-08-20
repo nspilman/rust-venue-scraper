@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::domain::{Artist, Event, Venue};
 use crate::pipeline::processing::parser::ParsedRecord;
+use crate::observability::metrics;
 use super::super::{NormalizedRecord, NormalizedEntity, RecordProvenance, NormalizationMetadata};
 
 /// Base trait for source-specific normalizers
@@ -16,6 +17,61 @@ pub trait SourceNormalizer: Send + Sync {
     
     /// Get a human-readable name for this normalizer
     fn name(&self) -> &str;
+}
+
+/// A wrapper that adds metrics to any normalizer implementation
+pub struct MetricsNormalizer<N: SourceNormalizer> {
+    inner: N,
+}
+
+impl<N: SourceNormalizer> MetricsNormalizer<N> {
+    pub fn new(inner: N) -> Self {
+        Self { inner }
+    }
+}
+
+impl<N: SourceNormalizer> SourceNormalizer for MetricsNormalizer<N> {
+    fn normalize(&self, record: &ParsedRecord) -> Result<Vec<NormalizedRecord>> {
+        let _start_time = std::time::Instant::now();
+        
+        match self.inner.normalize(record) {
+            Ok(normalized_records) => {
+                // Record successful normalization with strategy
+                let strategy = self.inner.source_id();
+                metrics::normalize::record_normalized(strategy);
+                
+                // Record confidence levels
+                for record in &normalized_records {
+                    metrics::normalize::confidence_recorded(record.normalization.confidence);
+                    
+                    // Check if geocoding was performed
+                    if record.normalization.geocoded {
+                        metrics::normalize::geocoding_performed();
+                    }
+                    
+                    // Record warnings
+                    for warning in &record.normalization.warnings {
+                        metrics::normalize::warning_logged(warning);
+                    }
+                }
+                
+                Ok(normalized_records)
+            }
+            Err(e) => {
+                // Record normalization error
+                metrics::normalize::warning_logged("normalization_error");
+                Err(e)
+            }
+        }
+    }
+    
+    fn source_id(&self) -> &str {
+        self.inner.source_id()
+    }
+    
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
 }
 
 /// Shared venue state manager for single-venue sources
@@ -47,7 +103,8 @@ impl VenueStateManager {
         }
     }
 
-    /// Reset the state (useful for testing)
+    /// Test-only: reset state
+    #[cfg(test)]
     pub fn reset(&self) {
         if let Ok(mut created) = self.venue_created.lock() {
             *created = false;
@@ -85,7 +142,8 @@ impl ArtistStateManager {
         }
     }
 
-    /// Reset the state (useful for testing)
+    /// Test-only: reset state
+    #[cfg(test)]
     pub fn reset(&self) {
         if let Ok(mut created_set) = self.created_artists.lock() {
             created_set.clear();
