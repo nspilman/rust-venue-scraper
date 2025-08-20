@@ -10,6 +10,7 @@ impl ParserFactory for DefaultParserFactory {
             "parse_plan:wix_calendar_v1" => Some(Box::new(WixCalendarAdapter)),
             "parse_plan:wix_warmup_v1" => Some(Box::new(WixWarmupAdapter)),
             "parse_plan:darrells_html_v1" => Some(Box::new(DarrellsHtmlAdapter)),
+            "parse_plan:kexp_html_v1" => Some(Box::new(KexpHtmlAdapter)),
             _ => None,
         }
     }
@@ -18,6 +19,7 @@ impl ParserFactory for DefaultParserFactory {
 struct WixCalendarAdapter;
 struct WixWarmupAdapter;
 struct DarrellsHtmlAdapter;
+struct KexpHtmlAdapter;
 
 #[async_trait]
 impl ParserPort for WixCalendarAdapter {
@@ -41,6 +43,15 @@ impl ParserPort for WixWarmupAdapter {
 impl ParserPort for DarrellsHtmlAdapter {
     async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
         let p = crate::pipeline::parser::DarrellsHtmlV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
+        let recs = p.parse(bytes).map_err(|e| e.to_string())?;
+        recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
+    }
+}
+
+#[async_trait]
+impl ParserPort for KexpHtmlAdapter {
+    async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
+        let p = crate::pipeline::parser::KexpHtmlV1Parser::new(source_id.to_string(), envelope_id.to_string(), payload_ref.to_string());
         let recs = p.parse(bytes).map_err(|e| e.to_string())?;
         recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
     }

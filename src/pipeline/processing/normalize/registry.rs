@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use anyhow::Result;
 
-use super::normalizers::{SourceNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer};
+use super::normalizers::{SourceNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer, KexpNormalizer};
 use super::NormalizedRecord;
 use crate::pipeline::processing::parser::ParsedRecord;
 
@@ -19,6 +19,7 @@ impl NormalizationRegistry {
         normalizers.insert("sea_monster".to_string(), Box::new(SeaMonsterNormalizer::new()));
         normalizers.insert("darrells_tavern".to_string(), Box::new(DarrellsTavernNormalizer::new()));
         normalizers.insert("blue_moon".to_string(), Box::new(BlueMoonNormalizer::new()));
+        normalizers.insert("kexp".to_string(), Box::new(KexpNormalizer::new()));
         
         Self {
             normalizers,
@@ -65,6 +66,7 @@ mod tests {
         assert!(sources.contains(&"sea_monster"));
         assert!(sources.contains(&"darrells_tavern"));
         assert!(sources.contains(&"blue_moon"));
+        assert!(sources.contains(&"kexp"));
     }
 
     #[test]

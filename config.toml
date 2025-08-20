@@ -2,3 +2,8 @@
 delay_ms = 500
 geo_point = "c22zp"  # Seattle
 timeout_seconds = 15
+
+[sources.kexp]
+url = "https://www.kexp.org/events/kexp-events/"
+enabled = true
+rate_limit_ms = 2000  # Be respectful to KEXP

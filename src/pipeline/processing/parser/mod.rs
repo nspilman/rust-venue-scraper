@@ -297,3 +297,119 @@ impl Parser for DarrellsHtmlV1Parser {
         Ok(out)
     }
 }
+
+// Parses KEXP HTML pages for live event listings
+pub struct KexpHtmlV1Parser {
+    pub source_id: String,
+    pub envelope_id: String,
+    pub payload_ref: String,
+}
+
+impl KexpHtmlV1Parser {
+    pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
+        Self {
+            source_id,
+            envelope_id,
+            payload_ref,
+        }
+    }
+}
+
+impl Parser for KexpHtmlV1Parser {
+    fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>> {
+        use scraper::{Html, Selector};
+        use tracing::{debug, info, warn};
+
+        debug!("KexpHtmlV1Parser: start bytes_len={}", bytes.len());
+        let html = String::from_utf8_lossy(bytes).to_string();
+        let document = Html::parse_document(&html);
+        
+        // KEXP events are in article.EventItem containers with h2 date headers
+        let event_selector = Selector::parse("article.EventItem").unwrap();
+        let title_selector = Selector::parse(".EventItem-body h3 a").unwrap();
+        let time_selector = Selector::parse(".EventItem-DateTime h5").unwrap();
+        let location_selector = Selector::parse(".EventItem-body .u-h3 a").unwrap();
+        let description_selector = Selector::parse(".EventItem-description").unwrap();
+        let date_selector = Selector::parse("h2").unwrap();
+
+        let mut out = Vec::new();
+        let mut current_date: Option<String> = None;
+        
+        // Process the document sequentially to match dates with events (like the working KEXP API does)
+        for element in document.select(&Selector::parse("h2, article.EventItem").unwrap()) {
+            if element.value().name() == "h2" {
+                // This is a date header
+                let date_text = element.text().collect::<Vec<_>>().join(" ");
+                current_date = Some(date_text.clone());
+                debug!("KexpHtmlV1Parser: found date header: {}", date_text);
+            } else if element.value().name() == "article" {
+                // This is an event item
+                let title = element
+                    .select(&title_selector)
+                    .next()
+                    .map(|el| el.text().collect::<String>().trim().to_string())
+                    .unwrap_or_else(|| "Unknown Event".to_string());
+                    
+                let time = element
+                    .select(&time_selector)
+                    .next()
+                    .map(|el| el.text().collect::<String>().trim().to_string())
+                    .unwrap_or_else(|| "".to_string());
+                    
+                let location = element
+                    .select(&location_selector)
+                    .next()
+                    .map(|el| el.text().collect::<String>().trim().to_string())
+                    .unwrap_or_else(|| "KEXP Studio".to_string());
+                    
+                let description = element
+                    .select(&description_selector)
+                    .next()
+                    .map(|el| el.text().collect::<String>().trim().to_string())
+                    .unwrap_or_else(|| "".to_string());
+
+                // Skip events that don't have meaningful content
+                if title.is_empty() || title == "Unknown Event" {
+                    continue;
+                }
+
+                // Create the record in the same format as other parsers
+                let record = serde_json::json!({
+                    "title": title,
+                    "event_day": current_date.clone().unwrap_or_else(|| "".to_string()),
+                    "event_time": time,
+                    "location": location,
+                    "description": description,
+                    "source": "kexp",
+                    "public": true
+                });
+                
+                debug!("KexpHtmlV1Parser: extracted event title='{}' date='{}'", title, current_date.as_deref().unwrap_or("unknown"));
+                
+                out.push(ParsedRecord {
+                    source_id: self.source_id.clone(),
+                    envelope_id: self.envelope_id.clone(),
+                    payload_ref: self.payload_ref.clone(),
+                    record_path: "article.EventItem".to_string(),
+                    record,
+                });
+            }
+        }
+        
+        if out.is_empty() {
+            warn!("KexpHtmlV1Parser: no events extracted; emitting fallback record with html_len={}", html.len());
+            // Fall back: emit entire HTML if nothing parsed for troubleshooting
+            out.push(ParsedRecord {
+                source_id: self.source_id.clone(),
+                envelope_id: self.envelope_id.clone(),
+                payload_ref: self.payload_ref.clone(),
+                record_path: "html".to_string(),
+                record: serde_json::json!({"html_len": html.len()}),
+            });
+        } else {
+            info!("KexpHtmlV1Parser: extracted events count={}", out.len());
+        }
+        
+        Ok(out)
+    }
+}
