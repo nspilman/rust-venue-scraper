@@ -30,7 +30,7 @@
                         <span class="truncate">
                             {% match event.venue %}
                                 {% when Some with (venue) %}
-                                    {{ venue.name }} - {{ venue.address }}
+                                    <a href="/venue/{{ venue.id }}" class="text-blue-600 hover:text-blue-800 hover:underline">{{ venue.name }}</a> - {{ venue.address }}
                                 {% when None %}
                                     No venue info
                             {% endmatch %}

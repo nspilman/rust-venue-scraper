@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ artist.name }} - Artist Page</title>
+    <title>{{ venue.name }} - Venue Page</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -14,21 +14,8 @@
             </nav>
             
             <div class="bg-white rounded-lg shadow-md p-8">
-                <h1 class="text-4xl font-bold text-gray-800 mb-4">{{ artist.name }}</h1>
-                
-                {% match artist.bio %}
-                    {% when Some with (bio) %}
-                    <p class="text-gray-600 mb-4">{{ bio }}</p>
-                    {% when None %}
-                {% endmatch %}
-                
-                {% match artist.artist_image_url %}
-                    {% when Some with (image_url) %}
-                    <div class="mb-4">
-                        <img src="{{ image_url }}" alt="{{ artist.name }}" class="w-32 h-32 rounded-full object-cover">
-                    </div>
-                    {% when None %}
-                {% endmatch %}
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">{{ venue.name }}</h1>
+                <p class="text-gray-600">{{ venue.address }}, {{ venue.city }}</p>
             </div>
         </header>
 
@@ -42,7 +29,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a1 1 0 011 1v9a1 1 0 01-1 1H5a1 1 0 01-1-1V8a1 1 0 011-1h3z" />
                         </svg>
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No upcoming events</h3>
-                        <p class="text-gray-500">{{ artist.name }} doesn't have any scheduled events at the moment.</p>
+                        <p class="text-gray-500">This venue doesn't have any scheduled events at the moment.</p>
                     </div>
                 </div>
             {% else %}
@@ -53,30 +40,15 @@
                             <div class="flex items-start justify-between mb-3">
                                 <h3 class="text-lg font-semibold text-gray-900 line-clamp-2">{{ event.title }}</h3>
                             </div>
-                            
+
                             <div class="space-y-2 mb-4">
-                                <div class="flex items-center text-sm text-gray-600">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                    <span class="truncate">
-                                        {% match event.venue %}
-                                            {% when Some with (venue) %}
-                                                <a href="/venue/{{ venue.id }}" class="text-blue-600 hover:text-blue-800 hover:underline">{{ venue.name }}</a> - {{ venue.address }}
-                                            {% when None %}
-                                                No venue info
-                                        {% endmatch %}
-                                    </span>
-                                </div>
-                                
                                 <div class="flex items-center text-sm text-gray-600">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a1 1 0 011-1h6a1 1 0 011 1v4h3a1 1 0 011 1v9a1 1 0 01-1 1H5a1 1 0 01-1-1V8a1 1 0 011-1h3z"></path>
                                     </svg>
                                     <span>{{ event.event_day }}</span>
                                 </div>
-                                
+
                                 {% match event.start_time %}
                                     {% when Some with (time) %}
                                     <div class="flex items-center text-sm text-gray-600">
@@ -88,13 +60,13 @@
                                     {% when None %}
                                 {% endmatch %}
                             </div>
-                            
+
                             {% match event.description %}
                                 {% when Some with (desc) %}
                                 <p class="text-sm text-gray-600 mb-4 line-clamp-3">{{ desc }}</p>
                                 {% when None %}
                             {% endmatch %}
-                            
+
                             <div class="flex items-center justify-between">
                                 {% match event.event_url %}
                                     {% when Some with (url) %}
@@ -111,7 +83,7 @@
                                     </a>
                                     {% when None %}
                                 {% endmatch %}
-                                
+
                                 <div class="text-xs text-gray-400">
                                     ID: {{ event.id }}
                                 </div>
