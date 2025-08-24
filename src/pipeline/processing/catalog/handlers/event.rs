@@ -102,9 +102,10 @@ impl EntityHandler for EventHandler {
         // Step 1: Extract event from the normalized entity in the conflated record
         // Build proposed event via mapper. Determine venue_id.
         let venue_id = if let NormalizedEntity::Event(e) = &record.enriched_record.quality_assessed_record.normalized_record.entity {
-            if e.venue_id == uuid::Uuid::nil() { record.canonical_entity_id.id } else { e.venue_id }
+            // Trust the normalized event's venue_id; if it's nil, we'll persist the event without a hosts edge
+            e.venue_id
         } else {
-            record.canonical_entity_id.id
+            uuid::Uuid::nil()
         };
         let Ok(proposed_event_base) = self.mappers.event_mapper.to_event(record, venue_id) else {
             debug!("No event found in conflated record");

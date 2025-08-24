@@ -1,4 +1,4 @@
-use crate::error::{Result, ScraperError};
+use crate::common::error::{Result, ScraperError};
 use libsql::{Builder, Connection, Database};
 use std::env;
 use tracing::info;
@@ -43,13 +43,20 @@ impl DatabaseManager {
 
         let conn = self.get_connection().await?;
 
-        // Read and execute the migration SQL
-        let migration_sql = include_str!("../migrations/001_create_nodes_and_edges.sql");
-
-        conn.execute_batch(migration_sql)
+        // Apply base schema
+        let migration_sql_001 = include_str!("../migrations/001_create_nodes_and_edges.sql");
+        conn.execute_batch(migration_sql_001)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to run migrations: {e}"),
+                message: format!("Failed to run base migration: {e}"),
+            })?;
+
+        // Apply indexes and PRAGMAs
+        let migration_sql_002 = include_str!("../migrations/002_indexes_and_pragmas.sql");
+        conn.execute_batch(migration_sql_002)
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to run index migration: {e}"),
             })?;
 
         info!("Database migrations completed successfully");
@@ -60,10 +67,14 @@ impl DatabaseManager {
     pub async fn create_node(&self, id: &str, label: &str, data: &str) -> Result<()> {
         let conn = self.get_connection().await?;
 
-        // Use INSERT OR REPLACE to handle both insert and update cases
+        // Use explicit ON CONFLICT(id) DO UPDATE to avoid destructive REPLACE semantics
         conn.execute(
-            "INSERT OR REPLACE INTO nodes (id, label, data, created_at, updated_at) VALUES (?, ?, ?, COALESCE((SELECT created_at FROM nodes WHERE id = ?), datetime('now')), datetime('now'))",
-            libsql::params![id, label, data, id]
+            "INSERT INTO nodes (id, label, data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, COALESCE((SELECT created_at FROM nodes WHERE id = ?1), datetime('now')), datetime('now'))
+             ON CONFLICT(id) DO UPDATE SET
+               data = excluded.data,
+               updated_at = excluded.updated_at",
+            libsql::params![id, label, data]
         )
         .await
         .map_err(|e| ScraperError::Database {
@@ -84,10 +95,14 @@ impl DatabaseManager {
     ) -> Result<()> {
         let conn = self.get_connection().await?;
 
-        // Use INSERT OR REPLACE to handle both insert and update cases
+        // Use unique (source_id, target_id, relation) to idempotently upsert edges
         conn.execute(
-            "INSERT OR REPLACE INTO edges (id, source_id, target_id, relation, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM edges WHERE id = ?), datetime('now')), datetime('now'))",
-            libsql::params![id, source_id, target_id, relation, data, id]
+            "INSERT INTO edges (id, source_id, target_id, relation, data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, COALESCE((SELECT created_at FROM edges WHERE source_id = ?2 AND target_id = ?3 AND relation = ?4), datetime('now')), datetime('now'))
+             ON CONFLICT(source_id, target_id, relation) DO UPDATE SET
+               data = excluded.data,
+               updated_at = excluded.updated_at",
+            libsql::params![id, source_id, target_id, relation, data]
         )
         .await
         .map_err(|e| ScraperError::Database {

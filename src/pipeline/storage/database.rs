@@ -127,7 +127,8 @@ impl DatabaseStorage {
 #[async_trait]
 impl Storage for DatabaseStorage {
     async fn create_venue(&self, venue: &mut Venue) -> Result<()> {
-        let id = Uuid::new_v4();
+        // Respect existing ID if provided by conflation; otherwise generate
+        let id = venue.id.unwrap_or_else(Uuid::new_v4);
         venue.id = Some(id);
 
         let node_data = Self::venue_to_node_data(venue)?;
@@ -136,10 +137,10 @@ impl Storage for DatabaseStorage {
             .create_node(&id.to_string(), "venue", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create venue node: {e}"),
+                message: format!("Failed to upsert venue node: {e}"),
             })?;
 
-        info!("Created venue: {} with id {}", venue.name, id);
+        info!("Upserted venue: {} with id {}", venue.name, id);
         Ok(())
     }
 
@@ -163,7 +164,8 @@ impl Storage for DatabaseStorage {
     }
 
     async fn create_artist(&self, artist: &mut Artist) -> Result<()> {
-        let id = Uuid::new_v4();
+        // Respect existing ID if provided; otherwise generate
+        let id = artist.id.unwrap_or_else(Uuid::new_v4);
         artist.id = Some(id);
 
         let node_data = Self::artist_to_node_data(artist)?;
@@ -172,10 +174,10 @@ impl Storage for DatabaseStorage {
             .create_node(&id.to_string(), "artist", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create artist node: {e}"),
+                message: format!("Failed to upsert artist node: {e}"),
             })?;
 
-        info!("Created artist: {} with id {}", artist.name, id);
+        info!("Upserted artist: {} with id {}", artist.name, id);
         Ok(())
     }
 
@@ -199,7 +201,8 @@ impl Storage for DatabaseStorage {
     }
 
     async fn create_event(&self, event: &mut Event) -> Result<()> {
-        let id = Uuid::new_v4();
+        // Respect existing ID if provided; otherwise generate
+        let id = event.id.unwrap_or_else(Uuid::new_v4);
         event.id = Some(id);
 
         let node_data = Self::event_to_node_data(event)?;
@@ -208,26 +211,29 @@ impl Storage for DatabaseStorage {
             .create_node(&id.to_string(), "event", &node_data)
             .await
             .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create event node: {e}"),
+                message: format!("Failed to upsert event node: {e}"),
             })?;
 
-        // Create edge from venue to event
-        let edge_id = Uuid::new_v4();
-        self.db
-            .create_edge(
-                &edge_id.to_string(),
-                &event.venue_id.to_string(),
-                &id.to_string(),
-                "hosts",
-                None,
-            )
-            .await
-            .map_err(|e| ScraperError::Database {
-                message: format!("Failed to create venue-event edge: {e}"),
-            })?;
+        // Create edge from venue to event if venue_id is valid (not nil)
+        if event.venue_id != Uuid::nil() {
+            let edge_id = Uuid::new_v4();
+            self.db
+                .create_edge(
+                    &edge_id.to_string(),
+                    &event.venue_id.to_string(),
+                    &id.to_string(),
+                    "hosts",
+                    None,
+                )
+                .await
+                .map_err(|e| ScraperError::Database {
+                    message: format!("Failed to upsert venue-event edge: {e}"),
+                })?;
+        }
 
         // Create edges from artists to event
         for artist_id in &event.artist_ids {
+            if *artist_id == Uuid::nil() { continue; }
             let artist_edge_id = Uuid::new_v4();
             self.db
                 .create_edge(
@@ -239,11 +245,11 @@ impl Storage for DatabaseStorage {
                 )
                 .await
                 .map_err(|e| ScraperError::Database {
-                    message: format!("Failed to create artist-event edge: {e}"),
+                    message: format!("Failed to upsert artist-event edge: {e}"),
                 })?;
         }
 
-        info!("Created event: {} with id {}", event.title, id);
+        info!("Upserted event: {} with id {}", event.title, id);
         Ok(())
     }
 
@@ -352,7 +358,6 @@ impl Storage for DatabaseStorage {
         {
             let mut raw_data = Self::node_data_to_raw_data(&id, &data)?;
             raw_data.processed = true;
-            raw_data.processed_at = Some(chrono::Utc::now());
 
             let updated_data = Self::raw_data_to_node_data(&raw_data)?;
 

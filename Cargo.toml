@@ -70,11 +70,13 @@ async-trait = "0.1"
 # GraphQL (pin to v6 to avoid edition 2024 requirement)
 async-graphql = { version = "6.0", features = ["chrono"] }
 async-graphql-axum = "6.0"
-# Axum 0.7 is compatible with async-graphql v6
-axum = { version = "0.7", features = ["json", "query", "tokio"] }
+# Use axum 0.6 to match async-graphql-axum v6 integration
+axum = { version = "0.6", features = ["json", "query", "tokio"] }
 tower = "0.4"
-# tower-http 0.5 works with axum 0.7
-tower-http = { version = "0.5", features = ["cors"] }
+# HTTP server
+hyper = { version = "0.14", features = ["http1", "server", "tcp"] }
+# tower-http 0.4 works with axum 0.6
+tower-http = { version = "0.4", features = ["cors", "fs"] }
 
 # JSON Schema validation
 jsonschema = "0.17"
@@ -84,7 +86,8 @@ sha2 = "0.10"
 hex = "0.4"
 
 # Local SQLite for ingest metadata (dedupe, offsets)
-rusqlite = { version = "0.31", features = ["bundled"] }
+# Use libsql's rusqlite-compatible fork to avoid linking a second SQLite (libsqlite3_sys)
+rusqlite = { package = "libsql-rusqlite", version = "0.31" }
 metrics = "0.23"
 metrics-exporter-prometheus = "0.13"
 
@@ -102,6 +105,7 @@ tempfile = "3.0"
 # Default build excludes database (Turso/libSQL) to minimize image size and build time.
 default = []
 # Enable Turso/libSQL-backed storage and related modules
-db = ["libsql"]
+# Use dep: syntax so Cargo treats libsql as the optional dependency to enable
+db = ["dep:libsql"]
 
 

@@ -1,20 +1,16 @@
 use crate::app::ports::NormalizeOutputPort;
-use std::io::BufWriter;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
-use tracing::info;
+use std::sync::Mutex;
+use tracing::{info, warn};
 
 /// File-based implementation of NormalizeOutputPort
 /// Writes normalized entities to separate NDJSON files
-#[allow(dead_code)]
 pub struct FileNormalizeOutputAdapter {
-    #[allow(dead_code)]
-    events_file: BufWriter<std::fs::File>,
-    #[allow(dead_code)]
-    venues_file: BufWriter<std::fs::File>,
-    #[allow(dead_code)]
-    artists_file: BufWriter<std::fs::File>,
-    #[allow(dead_code)]
+    events_file: Mutex<std::io::BufWriter<std::fs::File>>,
+    venues_file: Mutex<std::io::BufWriter<std::fs::File>>,
+    artists_file: Mutex<std::io::BufWriter<std::fs::File>>,
     file_path_base: String,
 }
 
@@ -37,7 +33,7 @@ impl FileNormalizeOutputAdapter {
         info!("  Venues: {}", venues_path.display());
         info!("  Artists: {}", artists_path.display());
         
-        let events_file = BufWriter::new(
+        let events_file = std::io::BufWriter::new(
             OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -45,7 +41,7 @@ impl FileNormalizeOutputAdapter {
                 .open(&events_path)?
         );
         
-        let venues_file = BufWriter::new(
+        let venues_file = std::io::BufWriter::new(
             OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -53,7 +49,7 @@ impl FileNormalizeOutputAdapter {
                 .open(&venues_path)?
         );
         
-        let artists_file = BufWriter::new(
+        let artists_file = std::io::BufWriter::new(
             OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -62,9 +58,9 @@ impl FileNormalizeOutputAdapter {
         );
         
         Ok(Self {
-            events_file,
-            venues_file,
-            artists_file,
+            events_file: Mutex::new(events_file),
+            venues_file: Mutex::new(venues_file),
+            artists_file: Mutex::new(artists_file),
             file_path_base: base_path.to_string(),
         })
     }
@@ -75,28 +71,33 @@ impl NormalizeOutputPort for FileNormalizeOutputAdapter {
     async fn write_normalized_record(&self, record: &crate::pipeline::processing::normalize::NormalizedRecord) -> anyhow::Result<()> {
         use crate::pipeline::processing::normalize::NormalizedEntity;
         
-        // Write each entity type to its appropriate file
-        // Note: This requires a mutable reference, but the trait defines immutable
-        // For now, we'll implement a basic version that accumulates records
-        // In a real implementation, you might want to use internal mutability with Mutex
-        
+        let line = serde_json::to_string(record)? + "\n";
         match &record.entity {
-            NormalizedEntity::Event(event) => {
-                // For this implementation, we'll need to store records and write them in batches
-                // This is a simplified version - in production you'd want better handling
-                let json_line = serde_json::to_string(event)?;
-                info!("Would write event: {}", json_line);
-            },
-            NormalizedEntity::Venue(venue) => {
-                let json_line = serde_json::to_string(venue)?;
-                info!("Would write venue: {}", json_line);
-            },
-            NormalizedEntity::Artist(artist) => {
-                let json_line = serde_json::to_string(artist)?;
-                info!("Would write artist: {}", json_line);
-            },
+            NormalizedEntity::Event(_) => {
+                if let Ok(mut f) = self.events_file.lock() {
+                    f.write_all(line.as_bytes()).map_err(|e| anyhow::anyhow!("write events failed: {}", e))?;
+                    f.flush().map_err(|e| anyhow::anyhow!("flush events failed: {}", e))?;
+                } else {
+                    warn!("normalize_output: failed to lock events file");
+                }
+            }
+            NormalizedEntity::Venue(_) => {
+                if let Ok(mut f) = self.venues_file.lock() {
+                    f.write_all(line.as_bytes()).map_err(|e| anyhow::anyhow!("write venues failed: {}", e))?;
+                    f.flush().map_err(|e| anyhow::anyhow!("flush venues failed: {}", e))?;
+                } else {
+                    warn!("normalize_output: failed to lock venues file");
+                }
+            }
+            NormalizedEntity::Artist(_) => {
+                if let Ok(mut f) = self.artists_file.lock() {
+                    f.write_all(line.as_bytes()).map_err(|e| anyhow::anyhow!("write artists failed: {}", e))?;
+                    f.flush().map_err(|e| anyhow::anyhow!("flush artists failed: {}", e))?;
+                } else {
+                    warn!("normalize_output: failed to lock artists file");
+                }
+            }
         }
-        
         Ok(())
     }
 }

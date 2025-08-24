@@ -1,21 +1,20 @@
-🚀 Starting GraphQL API server on port 8081...
-[2m2025-08-14T05:13:17.632892Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m42:[0m Prometheus HTTP exporter requested at http://0.0.0.0:9898/metrics
-[2m2025-08-14T05:13:17.834242Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m51:[0m Prometheus recorder installed (handle available for in-process render)
-[2m2025-08-14T05:13:17.834828Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 7 metrics for phase 'sources'
-[2m2025-08-14T05:13:17.835250Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 10 metrics for phase 'gateway'
-[2m2025-08-14T05:13:17.836047Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 11 metrics for phase 'ingest_log'
-[2m2025-08-14T05:13:17.836270Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m40:[0m Registering 15 metrics for phase 'parser'
-[2m2025-08-14T05:13:17.836338Z[0m [32m INFO[0m [2msms_scraper::metrics::registry[0m[2m:[0m [2msrc/metrics/registry.rs[0m[2m:[0m[2m23:[0m Registered 43 total metrics across all phases
-[2m2025-08-14T05:13:17.836381Z[0m [32m INFO[0m [2msms_scraper::metrics[0m[2m:[0m [2msrc/metrics/mod.rs[0m[2m:[0m[2m55:[0m All pipeline metrics registered successfully
-[2m2025-08-14T05:13:17.836403Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m199:[0m Using in-memory storage (data will not persist)
+🚀 Starting GraphQL API server on port 8080...
+[2m2025-08-24T19:35:10.281582Z[0m [32m INFO[0m [2msms_scraper::observability::metrics[0m[2m:[0m [2msrc/observability/metrics.rs[0m[2m:[0m[2m519:[0m Metrics system initialized with push gateway support
+[2m2025-08-24T19:35:10.281685Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m193:[0m Creating database storage connection...
+[2m2025-08-24T19:35:10.281710Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m21:[0m Connecting to Turso database at libsql://rust-venue-scraper-nspilman.aws-us-west-2.turso.io
+[2m2025-08-24T19:35:10.430512Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m42:[0m Running database migrations...
+[2m2025-08-24T19:35:10.594916Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m62:[0m Database migrations completed successfully
+[2m2025-08-24T19:35:10.594986Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m196:[0m ✅ Database storage initialized successfully
 📡 Server endpoints:
-   GraphQL API: http://localhost:8081/graphql
-   Metrics: http://0.0.0.0:9898/metrics
-   GraphiQL UI: http://localhost:8081/graphiql
-   Playground UI: http://localhost:8081/playground
-   Health check: http://localhost:8081/health
+   GraphQL API: http://localhost:8080/graphql
+   Metrics: http://127.0.0.1:9464/metrics
+   GraphiQL UI: http://localhost:8080/graphiql
+   Playground UI: http://localhost:8080/playground
+   Health check: http://localhost:8080/health
 
-🧠 Using in-memory storage (data will not persist)
+💾 Using database storage
 
-🚀 HTTP server running on http://localhost:8081
-💚 Health check: http://localhost:8081/health
+🚀 HTTP server running on http://localhost:8080
+💚 Health check: http://localhost:8080/health
+🔎 GraphQL:      http://localhost:8080/graphql
+🧪 GraphiQL UI:  http://localhost:8080/graphiql

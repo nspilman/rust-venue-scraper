@@ -3,16 +3,22 @@
 # --- Build stage ---
 FROM rust:1.83-alpine AS builder
 WORKDIR /app
-# System deps for musl builds (include static OpenSSL for musl)
+
+# System deps for musl builds
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig build-base curl ca-certificates
-# Cache deps first
-COPY Cargo.toml Cargo.lock ./
-# Create dummy src to cache dependencies (file, not directory)
-RUN mkdir -p src && printf 'fn main(){}' > src/main.rs
-# Now copy the real source
+
+# Copy everything and build with cache mounts
+# The cache mounts persist between builds, so only changed code gets recompiled
 COPY . .
-# Final build with stable toolchain (disable default features to avoid pulling optional DB)
-RUN cargo build --release --no-default-features
+
+# Build both projects with BuildKit cache mounts for maximum caching
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --features db && \
+    cargo build --release --manifest-path web-server/Cargo.toml --target-dir /app/target && \
+    # Copy binaries out of the cache mount to avoid losing them
+    cp /app/target/release/sms_scraper /tmp/sms_scraper && \
+    cp /app/target/release/web-server /tmp/web-server
 
 # --- Runtime stage ---
 FROM alpine:3.19
@@ -20,16 +26,15 @@ WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app \
     && chown -R app:app /app \
     && apk add --no-cache curl
-COPY --from=builder /app/target/release/sms_scraper /usr/local/bin/sms_scraper
-# Include runtime assets needed by the binary (registry files)
-# Create minimal registry structure and copy only required source specs
+    
+COPY --from=builder /tmp/sms_scraper /usr/local/bin/sms_scraper
+COPY --from=builder /tmp/web-server /usr/local/bin/web-server
+
+# Include runtime assets
 RUN mkdir -p /app/registry/sources
-COPY --from=builder /app/registry/sources/blue_moon.json /app/registry/sources/blue_moon.json
-COPY --from=builder /app/registry/sources/sea_monster.json /app/registry/sources/sea_monster.json
-COPY --from=builder /app/registry/sources/darrells_tavern.json /app/registry/sources/darrells_tavern.json
-# Expose GraphQL server port and Prometheus metrics port
-EXPOSE 8080 9898
+COPY --from=builder /app/registry/sources/*.json /app/registry/sources/
+
+EXPOSE 8080 9898 3000
 USER app
-# Default command runs the long-lived server so the metrics endpoint stays up.
 ENV SMS_METRICS_PORT=9898
-CMD ["/usr/local/bin/sms_scraper", "server", "--port", "8080"]
+CMD ["/usr/local/bin/sms_scraper", "server", "--port", "8080", "--use-database"]

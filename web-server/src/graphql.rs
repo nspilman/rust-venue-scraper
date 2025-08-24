@@ -1,6 +1,7 @@
 use crate::models::{Artist, Event, EventFilter, GraphQLRequest, Venue};
 use crate::state::AppState;
 use serde_json::json;
+use chrono::Local;
 
 pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<Event>, String> {
     let query_parts = vec![
@@ -22,6 +23,8 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<
     let has_search = has_non_empty_filter(&filter.search);
     let has_venue = has_non_empty_filter(&filter.venue);
 
+    // Use searchEvents when filters are provided; otherwise, ask the API for upcomingEvents
+    let default_days = 365; // horizon for "future" events on the homepage
     let query = if has_search || has_venue {
         format!(
             r#"
@@ -36,8 +39,8 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<
     } else {
         format!(
             r#"
-            query {{
-                events {{
+            query($days: Int) {{
+                upcomingEvents(days: $days) {{
                     {}
                 }}
             }}
@@ -60,7 +63,7 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<
         }
         Some(serde_json::Value::Object(vars))
     } else {
-        None
+        Some(json!({ "days": default_days }))
     };
 
     let request = GraphQLRequest { query, variables };
@@ -88,6 +91,8 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<
     let events_json = if let Some(data) = response_json.get("data") {
         if let Some(search_events) = data.get("searchEvents") {
             search_events
+        } else if let Some(upcoming) = data.get("upcomingEvents") {
+            upcoming
         } else if let Some(events) = data.get("events") {
             events
         } else {
@@ -99,6 +104,10 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter) -> Result<Vec<
 
     let mut events: Vec<Event> = serde_json::from_value(events_json.clone())
         .map_err(|e| format!("Failed to deserialize events: {} - JSON: {}", e, events_json))?;
+
+    // Keep only events from today onward
+    let today = Local::now().date_naive();
+    events.retain(|e| e.event_day >= today);
 
     events.sort_by(|a, b| a.event_day.cmp(&b.event_day));
 

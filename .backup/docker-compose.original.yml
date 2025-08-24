@@ -1,8 +1,6 @@
 services:
   scraper:
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    build: .
     image: sms-scraper:latest
     container_name: sms_scraper
     ports:
@@ -26,7 +24,7 @@ services:
     command: ["/usr/local/bin/sms_scraper", "server", "--port", "8080"]
 
   web:
-    # Reuse the same image since both binaries are in it
+    build: .
     image: sms-scraper:latest
     container_name: sms_web
     depends_on:
@@ -45,10 +43,10 @@ services:
     profiles: ["disabled"]
     environment:
       - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
-      - PROMETHEUS_ADDR=0.0.0.0:9898
+      - PROMETHEUS_ADDR=0.0.0.0:9898  # Metrics will be scraped from this port
       - RUST_LOG=info
     ports:
-      - "9898:9898"
+      - "9898:9898"  # Expose metrics port for scraping
     volumes:
       - ./data:/app/data
     depends_on:

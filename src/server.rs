@@ -4,13 +4,24 @@ use crate::pipeline::tasks::{
 };
 use axum::{
     http::Method,
-    response::{IntoResponse, Json},
+    response::{Html, IntoResponse, Json},
     routing::{get, post},
-    Json as AxumJson, Router,
+    Extension, Json as AxumJson, Router,
 };
+use hyper::Server;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
+
+// GraphQL imports
+use crate::graphql::{
+    resolvers::Query,
+    schema::{GraphQLContext, GraphQLSchema},
+};
+use async_graphql::{EmptyMutation, EmptySubscription, Schema};
+use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 
 /// Health check endpoint
 async fn health() -> impl IntoResponse {
@@ -21,15 +32,102 @@ async fn health() -> impl IntoResponse {
     }))
 }
 
-/// Create the HTTP server with all routes (no GraphQL to reduce deps)
+/// GraphQL handler (supports GET and POST)
+async fn graphql_handler(
+    Extension(schema): Extension<GraphQLSchema>,
+    req: GraphQLRequest,
+) -> GraphQLResponse {
+    schema.execute(req.into_inner()).await.into()
+}
+
+/// GraphiQL UI (pinned CDN versions to avoid upstream breaking changes)
+async fn graphiql() -> impl IntoResponse {
+    let html = r#"<!DOCTYPE html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>GraphiQL</title>
+    <link id=\"graphiql-css\" rel=\"stylesheet\" href=\"/assets/graphiql/graphiql.min.css\" onerror=\"this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/graphiql@2.7.5/graphiql.min.css'\" />
+    <style>
+      html, body, #graphiql { height: 100%; margin: 0; width: 100%; }
+      .error { padding: 16px; font-family: sans-serif; color: #b00020; }
+    </style>
+  </head>
+  <body>
+    <div id=\"graphiql\"></div>
+    <div id=\"error\" class=\"error\" style=\"display:none\"></div>
+    <script>
+      function loadScript(src, cb){
+        var s=document.createElement('script');
+        s.src=src; s.crossOrigin='anonymous';
+        s.onload=function(){ cb && cb(); };
+        s.onerror=function(){ cb && cb(new Error('load failed: '+src)); };
+        document.head.appendChild(s);
+      }
+      function render(){
+        try {
+          const fetcher = GraphiQL.createFetcher({ url: '/graphql' });
+          const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+          root.render(React.createElement(GraphiQL, { fetcher }));
+        } catch (e) {
+          var el=document.getElementById('error');
+          el.style.display='block';
+          el.textContent='Failed to initialize GraphiQL: '+e;
+        }
+      }
+      function start(){
+        if (window.GraphiQL && window.React && window.ReactDOM) { return render(); }
+        // Prefer local assets, then fall back to CDNs
+        loadScript('/assets/graphiql/react.production.min.js', function(){
+          if (!window.React) return loadScript('https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js', function(){});
+        });
+        loadScript('/assets/graphiql/react-dom.production.min.js', function(){
+          if (!window.ReactDOM) return loadScript('https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js', function(){});
+        });
+        loadScript('/assets/graphiql/graphiql.min.js', function(err){
+          if (err || !window.GraphiQL){
+            loadScript('https://cdn.jsdelivr.net/npm/graphiql@2.7.5/graphiql.min.js', function(){
+              if (window.GraphiQL) render();
+              else {
+                var el=document.getElementById('error');
+                el.style.display='block';
+                el.textContent='Could not load GraphiQL assets from CDNs. Check network/CSP or use a different network.';
+              }
+            });
+          } else {
+            render();
+          }
+        });
+      }
+      // Kick off after DOM ready
+      (document.readyState === 'loading') ? document.addEventListener('DOMContentLoaded', start) : start();
+    </script>
+  </body>
+</html>"#;
+    Html(html.to_string())
+}
+
+/// Create the HTTP server with all routes, including GraphQL
 pub fn create_server(storage: Arc<dyn Storage>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
+    // Build GraphQL schema and attach storage in context
+    let schema: GraphQLSchema = Schema::build(Query, EmptyMutation, EmptySubscription)
+        .data(GraphQLContext { storage: storage.clone() })
+        .finish();
+
     Router::new()
         .route("/health", get(health))
+        // Serve local assets (GraphiQL JS/CSS)
+        .nest_service("/assets", ServeDir::new("assets"))
+        // GraphQL endpoints
+        .route("/graphql", post(graphql_handler).get(graphql_handler))
+        .route("/graphiql", get(graphiql))
+        .layer(Extension(schema))
         // Admin/task endpoints
         .route(
             "/admin/gateway-once",
@@ -68,22 +166,23 @@ pub fn create_server(storage: Arc<dyn Storage>) -> Router {
             }),
         )
         .layer(ServiceBuilder::new().layer(cors))
-        .with_state(())
 }
 
-/// Start the GraphQL server on the specified port
+/// Start the HTTP server on the specified port
 pub async fn start_server(
     storage: Arc<dyn Storage>,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app = create_server(storage);
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     println!("🚀 HTTP server running on http://localhost:{port}");
     println!("💚 Health check: http://localhost:{port}/health");
+    println!("🔎 GraphQL:      http://localhost:{port}/graphql");
+    println!("🧪 GraphiQL UI:  http://localhost:{port}/graphiql");
 
-    axum::serve(listener, app).await?;
+    Server::bind(&addr).serve(app.into_make_service()).await?;
 
     Ok(())
 }
