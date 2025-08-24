@@ -107,8 +107,50 @@ impl Query {
         }
     }
 
-    /// Get all events with optional pagination
+    /// Get events with optional pagination (defaults to future events only)
     async fn events(
+        &self,
+        ctx: &Context<'_>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+        include_past: Option<bool>,
+    ) -> FieldResult<Vec<Event>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let limit = limit.map(|l| l as usize);
+        let offset = offset.map(|o| o as usize);
+        let include_past = include_past.unwrap_or(false);
+
+        match context.storage.get_all_events(None, None).await {
+            Ok(mut events) => {
+                // Filter out past events unless explicitly requested
+                if !include_past {
+                    let today = chrono::Utc::now().date_naive();
+                    events.retain(|e| e.event_day >= today);
+                }
+                
+                // Apply pagination
+                let total = events.len();
+                let start = offset.unwrap_or(0);
+                let end = if let Some(lim) = limit {
+                    std::cmp::min(start + lim, total)
+                } else {
+                    total
+                };
+                
+                Ok(events
+                    .into_iter()
+                    .skip(start)
+                    .take(end - start)
+                    .map(|e| e.into())
+                    .collect())
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+    
+    /// Get all events including past ones (for historical data)
+    async fn all_events(
         &self,
         ctx: &Context<'_>,
         limit: Option<i32>,
@@ -125,13 +167,21 @@ impl Query {
         }
     }
 
-    /// Get events by venue ID
-    async fn events_by_venue(&self, ctx: &Context<'_>, venue_id: ID) -> FieldResult<Vec<Event>> {
+    /// Get events by venue ID (only returns future events)
+    async fn events_by_venue(&self, ctx: &Context<'_>, venue_id: ID, include_past: Option<bool>) -> FieldResult<Vec<Event>> {
         let context = ctx.data::<GraphQLContext>()?;
         let venue_uuid = Uuid::parse_str(&venue_id)?;
+        let include_past = include_past.unwrap_or(false);
 
         match context.storage.get_events_by_venue_id(venue_uuid).await {
-            Ok(events) => Ok(events.into_iter().map(|e| e.into()).collect()),
+            Ok(mut events) => {
+                // Filter out past events unless explicitly requested
+                if !include_past {
+                    let today = chrono::Utc::now().date_naive();
+                    events.retain(|e| e.event_day >= today);
+                }
+                Ok(events.into_iter().map(|e| e.into()).collect())
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -177,7 +227,7 @@ impl Query {
         }
     }
 
-    /// Search events by title and optionally filter by venue name
+    /// Search events by title and optionally filter by venue name (only returns future events)
     async fn search_events(
         &self,
         ctx: &Context<'_>,
@@ -190,6 +240,9 @@ impl Query {
 
         let limit = limit.map(|l| l as usize);
         let offset = offset.map(|o| o as usize);
+        
+        // Get today's date for filtering
+        let today = chrono::Utc::now().date_naive();
 
         // Get all events first
         let all_events = match context.storage.get_all_events(None, None).await {
@@ -197,10 +250,15 @@ impl Query {
             Err(e) => return Err(e.into()),
         };
 
-        // Apply filtering
+        // Apply filtering - IMPORTANT: Also filter out past events
         let mut filtered_events: Vec<_> = all_events
             .into_iter()
             .filter(|event| {
+                // Filter out past events
+                if event.event_day < today {
+                    return false;
+                }
+                
                 // Filter by search term in title
                 let title_matches = if let Some(search_term) = &search {
                     event
