@@ -75,6 +75,15 @@ impl EventHandler {
             );
         }
         
+        // Check if artist_ids have changed
+        if proposed.artist_ids != current.artist_ids {
+            changeset.add_change(
+                "artist_ids",
+                Some(format!("{:?}", current.artist_ids)),
+                Some(format!("{:?}", proposed.artist_ids))
+            );
+        }
+        
         if changeset.has_changes {
             changeset.change_summary = format!("Updated event: {}", proposed.title);
         }
@@ -101,12 +110,45 @@ impl EntityHandler for EventHandler {
     ) -> Result<Option<CatalogCandidate>> {
         // Step 1: Extract event from the normalized entity in the conflated record
         // Build proposed event via mapper. Determine venue_id.
-        let venue_id = if let NormalizedEntity::Event(e) = &record.enriched_record.quality_assessed_record.normalized_record.entity {
-            // Trust the normalized event's venue_id; if it's nil, we'll persist the event without a hosts edge
+        let mut venue_id = if let NormalizedEntity::Event(e) = &record.enriched_record.quality_assessed_record.normalized_record.entity {
             e.venue_id
         } else {
             uuid::Uuid::nil()
         };
+        
+        // Step 1.5: If venue_id is nil, try to resolve it based on source
+        if venue_id == uuid::Uuid::nil() {
+            let source_id = &record.enriched_record.quality_assessed_record.normalized_record.provenance.source_id;
+            
+            // Map source to venue name for known single-venue sources
+            let venue_name = match source_id.as_str() {
+                "barboza" => Some("The Barboza"),
+                "kexp" => Some("KEXP Events"),
+                "blue_moon" => Some("Blue Moon Tavern"),
+                "darrells_tavern" => Some("Darrell's Tavern"),
+                "sea_monster" => Some("Sea Monster Lounge"),
+                _ => None,
+            };
+            
+            // Try to find the venue by name
+            if let Some(name) = venue_name {
+                match storage.get_venue_by_name(name).await {
+                    Ok(Some(venue)) => {
+                        if let Some(id) = venue.id {
+                            venue_id = id;
+                            debug!("Resolved venue {} for event from source {}", name, source_id);
+                        }
+                    }
+                    Ok(None) => {
+                        debug!("Could not find venue {} for source {}", name, source_id);
+                    }
+                    Err(e) => {
+                        debug!("Error looking up venue {}: {:?}", name, e);
+                    }
+                }
+            }
+        }
+        
         let Ok(proposed_event_base) = self.mappers.event_mapper.to_event(record, venue_id) else {
             debug!("No event found in conflated record");
             return Ok(None);
@@ -115,6 +157,16 @@ impl EntityHandler for EventHandler {
         // Step 2: Prepare the event for persistence - the normalized event is already the correct domain struct
         let mut proposed_event = proposed_event_base.clone();
         proposed_event.id = Some(record.canonical_entity_id.id);
+        
+        // Artist IDs are now populated during normalization, no need to resolve them here
+        debug!("Event '{}' has {} artist(s) linked from mapper: {:?}", 
+            proposed_event.title, proposed_event.artist_ids.len(), proposed_event.artist_ids);
+        
+        if !proposed_event.artist_ids.is_empty() {
+            debug!("Event has artist IDs!");
+        } else {
+            debug!("WARNING: Event has NO artist IDs!");
+        }
         // Ensure defaults that the mapper may not set for this persistence step
         proposed_event.show_event = true;
         proposed_event.finalized = false;
@@ -177,6 +229,8 @@ let current_entity = PersistedEntity::Event;
             Ok(true)
         } else {
             // Update existing event
+            debug!("Updating event '{}' with {} artist_ids: {:?}", 
+                event.title, event.artist_ids.len(), event.artist_ids);
             storage.update_event(event).await?;
             debug!("Updated event: {}", event.title);
             Ok(true)

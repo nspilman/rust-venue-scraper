@@ -275,6 +275,26 @@ impl DefaultConflator {
         }
     }
     
+    /// Generate entity ID, preserving existing ID if present in normalized entity
+    fn generate_entity_id_from_record(&self, record: &EnrichedRecord) -> EntityId {
+        use crate::pipeline::processing::normalize::NormalizedEntity;
+        
+        let entity_type = self.determine_entity_type(record);
+        
+        // Check if the normalized entity already has an ID assigned
+        let existing_id = match &record.quality_assessed_record.normalized_record.entity {
+            NormalizedEntity::Artist(artist) => artist.id,
+            NormalizedEntity::Event(event) => event.id,
+            NormalizedEntity::Venue(venue) => venue.id,
+        };
+        
+        EntityId {
+            id: existing_id.unwrap_or_else(Uuid::new_v4),
+            entity_type,
+            version: 1,
+        }
+    }
+    
     /// Determine entity type from enriched record
     fn determine_entity_type(&self, record: &EnrichedRecord) -> EntityType {
         use crate::pipeline::processing::normalize::NormalizedEntity;
@@ -340,8 +360,8 @@ impl Conflator for DefaultConflator {
         
         // Determine resolution decision based on potential matches
         let (resolution_decision, canonical_entity_id, confidence) = if potential_matches.is_empty() {
-            // No matches found - create new entity
-            let new_id = self.generate_entity_id(entity_type);
+            // No matches found - create new entity, preserving ID if already set
+            let new_id = self.generate_entity_id_from_record(record);
             (ResolutionDecision::NewEntity, new_id, 1.0)
         } else {
             // Find best match
@@ -358,8 +378,8 @@ impl Conflator for DefaultConflator {
                     best_match.similarity_score,
                 )
             } else {
-                // Low confidence - treat as new entity but add warning
-                let new_id = self.generate_entity_id(entity_type);
+                // Low confidence - treat as new entity but add warning, preserving ID if already set
+                let new_id = self.generate_entity_id_from_record(record);
                 warnings.push(format!(
                     "Potential matches found but confidence too low (best: {:.2})",
                     best_match.similarity_score

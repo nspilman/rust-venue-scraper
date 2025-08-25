@@ -69,34 +69,23 @@ impl SourceNormalizer for KexpNormalizer {
                 .map(|s| s.to_string())
                 .or_else(|| location.clone()); // Use location as description if no description
 
-            let event = Event {
-                id: None,
-                title: title.clone(),
-                event_day,
-                start_time,
-                event_url: Some("https://www.kexp.org/events/".to_string()),
-                description,
-                event_image_url: None,
-                venue_id: Uuid::nil(),
-                artist_ids: Vec::new(),
-                show_event: true,
-                finalized: false,
-                created_at: Utc::now(),
-            };
-
-            results.push(NormalizerUtils::create_event_record(
-                event, 
-                provenance.clone(), 
-                0.9, 
-                "kexp_event".to_string()
-            ));
-
-            // Extract artist from title (excluding known non-artist events), but only create if not already seen
+            // Collect artist IDs as we create artists
+            let mut event_artist_ids = Vec::new();
+            
+            // Extract artist from title (excluding known non-artist events)
             if !NormalizerUtils::is_non_artist_event(&title) {
                 let name_slug = NormalizerUtils::generate_slug(&title);
+                
+                // Generate deterministic UUID from the artist slug
+                let artist_id = Uuid::new_v5(&Uuid::NAMESPACE_DNS, name_slug.as_bytes());
+                
+                // Track this artist ID for the event
+                event_artist_ids.push(artist_id);
+                
+                // Only create the artist entity if we haven't seen it before
                 if self.artist_state.should_create_artist(&name_slug) {
                     let artist = Artist {
-                        id: None,
+                        id: Some(artist_id),  // Use the deterministic ID
                         name: title.clone(),
                         name_slug,
                         bio: None,
@@ -112,6 +101,29 @@ impl SourceNormalizer for KexpNormalizer {
                     ));
                 }
             }
+
+            // Now create the event with the linked artist IDs
+            let event = Event {
+                id: None,
+                title: title.clone(),
+                event_day,
+                start_time,
+                event_url: Some("https://www.kexp.org/events/".to_string()),
+                description,
+                event_image_url: None,
+                venue_id: Uuid::nil(),
+                artist_ids: event_artist_ids,  // Link the artists!
+                show_event: true,
+                finalized: false,
+                created_at: Utc::now(),
+            };
+
+            results.push(NormalizerUtils::create_event_record(
+                event, 
+                provenance.clone(), 
+                0.9, 
+                "kexp_event".to_string()
+            ));
         }
 
         // Create the KEXP venue only once

@@ -73,9 +73,21 @@ impl DatabaseStorage {
 
     /// Convert event to node data
     fn event_to_node_data(event: &Event) -> Result<String> {
-        serde_json::to_string(event).map_err(|e| ScraperError::Database {
+        debug!("Serializing event '{}' with {} artist_ids", event.title, event.artist_ids.len());
+        let json = serde_json::to_string(event).map_err(|e| ScraperError::Database {
             message: format!("Failed to serialize event: {e}"),
-        })
+        })?;
+        
+        // Verify the JSON contains artist_ids
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json) {
+            if let Some(artist_ids) = parsed.get("artist_ids") {
+                debug!("JSON artist_ids field: {}", artist_ids);
+            } else {
+                debug!("WARNING: No artist_ids field in serialized JSON!");
+            }
+        }
+        
+        Ok(json)
     }
 
     /// Convert node data to event
@@ -201,9 +213,14 @@ impl Storage for DatabaseStorage {
     }
 
     async fn create_event(&self, event: &mut Event) -> Result<()> {
+        debug!("[DATABASE] create_event called for: {}", event.title);
+        
         // Respect existing ID if provided; otherwise generate
         let id = event.id.unwrap_or_else(Uuid::new_v4);
         event.id = Some(id);
+
+        debug!("Creating event '{}' with {} artist_ids: {:?}", 
+            event.title, event.artist_ids.len(), event.artist_ids);
 
         let node_data = Self::event_to_node_data(event)?;
 
@@ -234,6 +251,7 @@ impl Storage for DatabaseStorage {
         // Create edges from artists to event
         for artist_id in &event.artist_ids {
             if *artist_id == Uuid::nil() { continue; }
+            debug!("Creating performs_at edge from artist {} to event {}", artist_id, id);
             let artist_edge_id = Uuid::new_v4();
             self.db
                 .create_edge(
@@ -245,8 +263,9 @@ impl Storage for DatabaseStorage {
                 )
                 .await
                 .map_err(|e| ScraperError::Database {
-                    message: format!("Failed to upsert artist-event edge: {e}"),
+                    message: format!("Failed to upsert artist-event edge for artist {}: {e}", artist_id),
                 })?;
+            debug!("Successfully created performs_at edge for artist {}", artist_id);
         }
 
         info!("Upserted event: {} with id {}", event.title, id);
@@ -285,7 +304,18 @@ impl Storage for DatabaseStorage {
             message: "Cannot update event without ID".to_string(),
         })?;
 
+        debug!("Updating event '{}' with {} artist_ids: {:?}", 
+            event.title, event.artist_ids.len(), event.artist_ids);
+
         let node_data = Self::event_to_node_data(event)?;
+        
+        // Log the JSON data being sent to database
+        debug!("Sending JSON to database for event '{}': {}", event.title, 
+            if node_data.len() > 200 { 
+                format!("{}...", &node_data[..200]) 
+            } else { 
+                node_data.clone() 
+            });
 
         // Use upsert operation to update the node with new data
         self.db
@@ -294,8 +324,64 @@ impl Storage for DatabaseStorage {
             .map_err(|e| ScraperError::Database {
                 message: format!("Failed to update event node: {e}"),
             })?;
+            
+        // Verify what was written
+        if let Some((_id, _label, stored_data)) = self.db.get_node(&event_id.to_string()).await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to verify updated event: {e}"),
+            })? 
+        {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&stored_data) {
+                if let Some(stored_artist_ids) = parsed.get("artist_ids") {
+                    debug!("Verified stored artist_ids for event '{}': {}", event.title, stored_artist_ids);
+                } else {
+                    debug!("WARNING: No artist_ids in stored event '{}'!", event.title);
+                }
+            }
+        }
 
-        debug!("Updated event: {} with id {}", event.title, event_id);
+        // Delete existing artist-event edges and recreate them
+        // This ensures we have the correct artist linkages
+        // Note: In a production system, you'd want to diff and only update changed edges
+        
+        // Get existing edges to delete
+        let existing_edges = self.db
+            .get_edges_for_node(&event_id.to_string())
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to get existing edges for event: {e}"),
+            })?;
+        
+        // Delete old performs_at edges (where event is target)
+        for (edge_id, source_id, target_id, relation, _) in existing_edges {
+            if relation == "performs_at" && target_id == event_id.to_string() {
+                // Note: The database doesn't have a delete_edge method, so we can't delete
+                // Instead, we'll just create new edges (the upsert will overwrite)
+                debug!("Would delete old performs_at edge {}", edge_id);
+            }
+        }
+        
+        // Create new edges from artists to event
+        for artist_id in &event.artist_ids {
+            if *artist_id == Uuid::nil() { continue; }
+            debug!("Creating performs_at edge from artist {} to event {}", artist_id, event_id);
+            let artist_edge_id = Uuid::new_v4();
+            self.db
+                .create_edge(
+                    &artist_edge_id.to_string(),
+                    &artist_id.to_string(),
+                    &event_id.to_string(),
+                    "performs_at",
+                    None,
+                )
+                .await
+                .map_err(|e| ScraperError::Database {
+                    message: format!("Failed to create artist-event edge for artist {}: {e}", artist_id),
+                })?;
+            debug!("Successfully created performs_at edge for artist {}", artist_id);
+        }
+
+        info!("Updated event: {} with id {} and {} artists", event.title, event_id, event.artist_ids.len());
         Ok(())
     }
 

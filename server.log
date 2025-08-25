@@ -1,10 +1,71 @@
+warning: field `file_path_base` is never read
+  --> src/infra/normalize_output_adapter.rs:14:5
+   |
+10 | pub struct FileNormalizeOutputAdapter {
+   |            -------------------------- field in this struct
+...
+14 |     file_path_base: String,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `sms_scraper` (lib) generated 1 warning
+warning: associated function `new` is never used
+   --> src/pipeline/processing/enrich.rs:100:12
+    |
+98  | impl<E: Enricher> MetricsEnricher<E> {
+    | ------------------------------------ associated function in this implementation
+99  |     /// Create a new metrics enricher wrapping the given enricher
+100 |     pub fn new(inner: E) -> Self {
+    |            ^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: field `file_path_base` is never read
+  --> src/infra/normalize_output_adapter.rs:14:5
+   |
+10 | pub struct FileNormalizeOutputAdapter {
+   |            -------------------------- field in this struct
+...
+14 |     file_path_base: String,
+   |     ^^^^^^^^^^^^^^
+
+warning: variants `Accepted` and `Quarantined` are never constructed
+  --> src/infra/quality_gate_output_adapter.rs:18:29
+   |
+18 | pub enum QualityPartition { Accepted, Quarantined }
+   |          ----------------   ^^^^^^^^  ^^^^^^^^^^^
+   |          |
+   |          variants in this enum
+   |
+   = note: `QualityPartition` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `new` is never used
+  --> src/infra/quality_gate_output_adapter.rs:21:12
+   |
+20 | impl FileQualityGateOutputAdapter {
+   | --------------------------------- associated function in this implementation
+21 |     pub fn new(output_dir: PathBuf, partition: QualityPartition) -> Self {
+   |            ^^^
+
+warning: associated function `new` is never used
+  --> src/infra/enrich_output_adapter.rs:16:12
+   |
+15 | impl FileEnrichOutputAdapter {
+   | ---------------------------- associated function in this implementation
+16 |     pub fn new(output_dir: PathBuf) -> Self { Self { output_dir } }
+   |            ^^^
+
+warning: `sms_scraper` (bin "sms_scraper") generated 5 warnings
+    Finished `release` profile [optimized] target(s) in 0.68s
+     Running `target/release/sms_scraper server --port 8080 --use-database`
 🚀 Starting GraphQL API server on port 8080...
-[2m2025-08-24T19:35:10.281582Z[0m [32m INFO[0m [2msms_scraper::observability::metrics[0m[2m:[0m [2msrc/observability/metrics.rs[0m[2m:[0m[2m519:[0m Metrics system initialized with push gateway support
-[2m2025-08-24T19:35:10.281685Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m193:[0m Creating database storage connection...
-[2m2025-08-24T19:35:10.281710Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m21:[0m Connecting to Turso database at libsql://rust-venue-scraper-nspilman.aws-us-west-2.turso.io
-[2m2025-08-24T19:35:10.430512Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m42:[0m Running database migrations...
-[2m2025-08-24T19:35:10.594916Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m62:[0m Database migrations completed successfully
-[2m2025-08-24T19:35:10.594986Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m196:[0m ✅ Database storage initialized successfully
+[2m2025-08-24T21:48:57.561217Z[0m [32m INFO[0m [2msms_scraper::observability::metrics[0m[2m:[0m [2msrc/observability/metrics.rs[0m[2m:[0m[2m519:[0m Metrics system initialized with push gateway support
+[2m2025-08-24T21:48:57.561331Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m195:[0m Creating database storage connection...
+[2m2025-08-24T21:48:57.561355Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m21:[0m Connecting to Turso database at libsql://rust-venue-scraper-nspilman.aws-us-west-2.turso.io
+[2m2025-08-24T21:48:57.715621Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m42:[0m Running database migrations...
+[2m2025-08-24T21:48:57.918498Z[0m [32m INFO[0m [2msms_scraper::db[0m[2m:[0m [2msrc/db.rs[0m[2m:[0m[2m62:[0m Database migrations completed successfully
+[2m2025-08-24T21:48:57.918583Z[0m [32m INFO[0m [2msms_scraper[0m[2m:[0m [2msrc/main.rs[0m[2m:[0m[2m198:[0m ✅ Database storage initialized successfully
 📡 Server endpoints:
    GraphQL API: http://localhost:8080/graphql
    Metrics: http://127.0.0.1:9464/metrics

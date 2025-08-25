@@ -80,6 +80,8 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
         bytes_per_min: spec.rate_limits.bytes_per_min,
         concurrency: spec.rate_limits.concurrency.map(|c| c.max(1)),
     });
+    // Build client - reqwest will automatically handle gzip/deflate decompression
+    // when the "gzip" and "deflate" features are enabled
     let client = reqwest::Client::new();
     rl.acquire(0).await; // acquire for RPM/concurrency before send
     let fetch_t0 = Instant::now();

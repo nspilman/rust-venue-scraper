@@ -31,7 +31,7 @@ use sms_scraper::{
     },
 };
 use chrono::Utc;
-use std::{path::PathBuf, sync::Arc};
+use std::{env, path::PathBuf, sync::Arc};
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -41,15 +41,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     observability::init_logging();
     dotenv::dotenv().ok();
 
+    // Parse command-line arguments
+    let args: Vec<String> = env::args().collect();
+    
+    // Check for --use-database flag
+    let use_database = args.iter().any(|arg| arg == "--use-database");
+    
+    // Determine source_id from command-line args or use default
+    let source_id = if args.len() > 1 && !args[1].starts_with("--") {
+        // Validate the source ID
+        match args[1].as_str() {
+            "barboza" => constants::BARBOZA_API,
+            "blue_moon" => constants::BLUE_MOON_API,
+            "kexp" => constants::KEXP_API,
+            "sea_monster" => constants::SEA_MONSTER_API,
+            "darrells_tavern" => constants::DARRELLS_TAVERN_API,
+            _ => {
+                println!("❌ Unknown source: {}", args[1]);
+                println!("Available sources: barboza, blue_moon, kexp, sea_monster, darrells_tavern");
+                return Ok(());
+            }
+        }
+    } else {
+        println!("ℹ️  No source specified, using default: blue_moon");
+        println!("Usage: {} <source_id> [--use-database]", args[0]);
+        println!("Available sources: barboza, blue_moon, kexp, sea_monster, darrells_tavern");
+        println!("Options:");
+        println!("  --use-database  Use database storage instead of in-memory");
+        constants::BLUE_MOON_API
+    };
+
     println!("\n🚀 FULL PIPELINE DEMO: From Source to Catalog");
     println!("{}", "=".repeat(60));
+    println!("Processing source: {}", source_id);
     println!("Following the Platonic Ideal:");
     println!("  Sources → Gateway → Parse → Normalize → Quality Gate");
     println!("  → Enrich → Conflation → Catalog");
     println!("{}", "=".repeat(60));
 
-    // Setup storage (using in-memory for demo)
-    let storage = Arc::new(InMemoryStorage::new()) as Arc<dyn Storage>;
+    // Setup storage based on flag
+    let storage: Arc<dyn Storage> = if use_database {
+        #[cfg(feature = "db")]
+        {
+            println!("💾 Using database storage (Turso)");
+            use sms_scraper::pipeline::storage::DatabaseStorage;
+            match DatabaseStorage::new().await {
+                Ok(db_storage) => Arc::new(db_storage),
+                Err(e) => {
+                    error!("Failed to connect to database: {}", e);
+                    println!("⚠️  Falling back to in-memory storage");
+                    Arc::new(InMemoryStorage::new())
+                }
+            }
+        }
+        #[cfg(not(feature = "db"))]
+        {
+            println!("⚠️  Database support not compiled. Using in-memory storage.");
+            println!("   Rebuild with: cargo build --features db");
+            Arc::new(InMemoryStorage::new())
+        }
+    } else {
+        println!("💾 Using in-memory storage");
+        Arc::new(InMemoryStorage::new())
+    };
 
     // Data root for CAS and ingest log
     let data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data");
@@ -59,8 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================================
     // STEP 1: GATEWAY - Fetch from source and create envelope
     // ================================================================================
-    println!("\n📥 STEP 1: GATEWAY - Fetching from source...");
-    let source_id = constants::BLUE_MOON_API;
+    println!("\n📥 STEP 1: GATEWAY - Fetching from source: {}...", source_id);
+    // source_id is now determined from command-line args
 
     let gateway_result = gateway_once(
         storage.clone(),
@@ -238,15 +292,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for enriched in enriched_records {
         // For demo, we'll create simple conflated records
         // In production, this would do sophisticated entity matching
-        let entity_type = match &enriched.quality_assessed_record.normalized_record.entity {
-            NormalizedEntity::Venue(_) => EntityType::Venue,
-            NormalizedEntity::Event(_) => EntityType::Event,
-            NormalizedEntity::Artist(_) => EntityType::Artist,
+        let (entity_type, existing_id) = match &enriched.quality_assessed_record.normalized_record.entity {
+            NormalizedEntity::Venue(v) => (EntityType::Venue, v.id),
+            NormalizedEntity::Event(e) => (EntityType::Event, e.id),
+            NormalizedEntity::Artist(a) => (EntityType::Artist, a.id),
+        };
+
+        // IMPORTANT: Preserve existing IDs from normalization stage
+        // Don't generate new UUIDs as this breaks artist-event linkage
+        let entity_id = if let Some(id) = existing_id {
+            id
+        } else {
+            // Only generate new UUID if absolutely necessary
+            Uuid::new_v4()
         };
 
         let conflated = ConflatedRecord {
             canonical_entity_id: EntityId {
-                id: Uuid::new_v4(),
+                id: entity_id,
                 entity_type,
                 version: 1,
             },

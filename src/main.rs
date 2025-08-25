@@ -22,6 +22,7 @@ mod infra;
 #[allow(dead_code)]
 mod architecture;
 
+use crate::apis::barboza::BarbozaCrawler;
 use crate::apis::blue_moon::BlueMoonCrawler;
 use crate::apis::darrells_tavern::DarrellsTavernCrawler;
 use crate::apis::kexp::KexpCrawler;
@@ -109,7 +110,7 @@ enum Commands {
     },
     /// Run the data ingestion process
     Ingester {
-        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp
+        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp, barboza
         #[arg(long)]
         apis: Option<String>,
         /// Use database storage instead of in-memory (requires LIBSQL_URL and LIBSQL_AUTH_TOKEN env vars)
@@ -134,7 +135,7 @@ enum Commands {
     /// One-off: fetch bytes for a source per registry, build envelope, persist CAS + envelope locally
     #[command(alias = "GatewayOnce")]
     GatewayOnce {
-        /// Source id to ingest (defaults to blue_moon, also available: kexp, sea_monster, darrells_tavern)
+        /// Source id to ingest (defaults to blue_moon, also available: kexp, sea_monster, darrells_tavern, barboza)
         #[arg(long)]
         source_id: Option<String>,
         /// Root data directory for CAS and ingest log (defaults to ./data)
@@ -151,7 +152,7 @@ enum Commands {
     },
     /// Architectural demo: ingest a single source via registry (ports/adapters)
     ArchIngestOnce {
-        /// Source id to ingest (e.g., blue_moon, kexp, sea_monster, darrells_tavern)
+        /// Source id to ingest (e.g., blue_moon, kexp, sea_monster, darrells_tavern, barboza)
         #[arg(long)]
         source_id: String,
         /// Data root (for CAS and ingest log)
@@ -179,6 +180,7 @@ fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
         constants::SEA_MONSTER_API => Some(Box::new(SeaMonsterCrawler::new())),
         constants::DARRELLS_TAVERN_API => Some(Box::new(DarrellsTavernCrawler::new())),
         constants::KEXP_API => Some(Box::new(KexpCrawler::new())),
+        constants::BARBOZA_API => Some(Box::new(BarbozaCrawler::new())),
         _ => None,
     }
 }

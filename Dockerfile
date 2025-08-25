@@ -32,7 +32,11 @@ COPY --from=builder /tmp/web-server /usr/local/bin/web-server
 
 # Include runtime assets
 RUN mkdir -p /app/registry/sources
-COPY --from=builder /app/registry/sources/*.json /app/registry/sources/
+COPY --from=builder /app/registry/sources/blue_moon.json /app/registry/sources/
+COPY --from=builder /app/registry/sources/sea_monster.json /app/registry/sources/
+COPY --from=builder /app/registry/sources/darrells_tavern.json /app/registry/sources/
+COPY --from=builder /app/registry/sources/kexp.json /app/registry/sources/
+COPY --from=builder /app/registry/sources/barboza.json /app/registry/sources/
 
 EXPOSE 8080 9898 3000
 USER app
