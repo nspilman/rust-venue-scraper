@@ -634,3 +634,207 @@ impl Parser for BarbozaHtmlV1Parser {
         Ok(out)
     }
 }
+
+// Parses Neumos HTML event listings
+pub struct NeumosHtmlV1Parser {
+    pub source_id: String,
+    pub envelope_id: String,
+    pub payload_ref: String,
+}
+
+impl NeumosHtmlV1Parser {
+    pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
+        Self {
+            source_id,
+            envelope_id,
+            payload_ref,
+        }
+    }
+}
+
+impl Parser for NeumosHtmlV1Parser {
+    fn parse(&self, bytes: &[u8]) -> anyhow::Result<Vec<ParsedRecord>> {
+        use scraper::{Html, Selector};
+        use tracing::{debug, info, warn};
+        use chrono::{Datelike, NaiveDate};
+
+        debug!("NeumosHtmlV1Parser: start bytes_len={}", bytes.len());
+        let html = String::from_utf8_lossy(bytes).to_string();
+        let document = Html::parse_document(&html);
+        
+        // Parse events using the actual HTML structure: div.eventItem
+        let event_selector = Selector::parse("div.eventItem").unwrap();
+        let title_selector = Selector::parse("h3.title a").unwrap();
+        let tagline_selector = Selector::parse("h4.tagline").unwrap();
+        let tour_selector = Selector::parse("div.promotion-text.tour").unwrap();
+        let promotion_selector = Selector::parse("div.promotion-text:not(.tour)").unwrap();
+        let month_selector = Selector::parse(".m-date__month").unwrap();
+        let day_selector = Selector::parse(".m-date__day").unwrap();
+        let time_selector = Selector::parse(".meta .time").unwrap();
+        let age_selector = Selector::parse(".meta .age").unwrap();
+        let ticket_link_selector = Selector::parse("a.tickets").unwrap();
+        let image_selector = Selector::parse(".thumb img").unwrap();
+
+        let mut out = Vec::new();
+        let current_year = chrono::Local::now().year();
+        let current_month = chrono::Local::now().month();
+        
+        for event_element in document.select(&event_selector) {
+            let mut record = serde_json::json!({});
+            
+            // Extract main title (headliner)
+            if let Some(title_elem) = event_element.select(&title_selector).next() {
+                let title = title_elem.text().collect::<String>().trim().to_string();
+                record["title"] = serde_json::json!(title);
+                
+                // Also get the event detail URL
+                if let Some(href) = title_elem.value().attr("href") {
+                    record["detail_url"] = serde_json::json!(href);
+                    // Extract event ID from URL if possible
+                    if let Some(id_match) = href.split('/').last() {
+                        record["id"] = serde_json::json!(id_match.to_string());
+                    }
+                }
+            }
+
+            // Extract tagline (supporting acts)
+            if let Some(tagline_elem) = event_element.select(&tagline_selector).next() {
+                let tagline = tagline_elem.text().collect::<String>().trim().to_string();
+                if !tagline.is_empty() {
+                    record["supporting_acts"] = serde_json::json!(tagline);
+                }
+            }
+
+            // Extract tour name if present
+            if let Some(tour_elem) = event_element.select(&tour_selector).next() {
+                let tour = tour_elem.text().collect::<String>().trim().to_string();
+                if !tour.is_empty() {
+                    record["tour_name"] = serde_json::json!(tour);
+                }
+            }
+
+            // Extract promotion text (e.g., "Neumos Presents")
+            if let Some(promo_elem) = event_element.select(&promotion_selector).next() {
+                let promo = promo_elem.text().collect::<String>().trim().to_string();
+                // Only save if it's not a tour name
+                if !promo.is_empty() && !event_element.select(&tour_selector).any(|t| t.text().collect::<String>().trim() == promo) {
+                    record["promoter"] = serde_json::json!(promo);
+                }
+            }
+
+            // Extract date (month and day)
+            let mut month_str = String::new();
+            let mut day_str = String::new();
+            
+            if let Some(month_elem) = event_element.select(&month_selector).next() {
+                month_str = month_elem.text().collect::<String>().trim().to_string();
+            }
+            
+            if let Some(day_elem) = event_element.select(&day_selector).next() {
+                day_str = day_elem.text().collect::<String>().trim().to_string();
+            }
+            
+            // Parse date and format as YYYY-MM-DD
+            if !month_str.is_empty() && !day_str.is_empty() {
+                let month = match month_str.to_lowercase().as_str() {
+                    "jan" => 1,
+                    "feb" => 2,
+                    "mar" => 3,
+                    "apr" => 4,
+                    "may" => 5,
+                    "jun" => 6,
+                    "jul" => 7,
+                    "aug" => 8,
+                    "sep" => 9,
+                    "oct" => 10,
+                    "nov" => 11,
+                    "dec" => 12,
+                    _ => 0,
+                };
+                
+                if let Ok(day) = day_str.parse::<u32>() {
+                    if month > 0 {
+                        // Handle year boundary - if parsed month is earlier than current month
+                        // and we're in the last quarter, it's probably next year
+                        let year = if month < current_month && current_month >= 10 {
+                            current_year + 1
+                        } else {
+                            current_year
+                        };
+                        
+                        if let Some(date) = NaiveDate::from_ymd_opt(year, month, day) {
+                            record["event_day"] = serde_json::json!(date.to_string());
+                            record["date_text"] = serde_json::json!(format!("{} {}", month_str, day_str));
+                        }
+                    }
+                }
+            }
+
+            // Extract time (e.g., "Doors: 7:00 PM")
+            if let Some(time_elem) = event_element.select(&time_selector).next() {
+                let time_text = time_elem.text().collect::<String>().trim().to_string();
+                record["time_text"] = serde_json::json!(time_text);
+                // Try to extract just the time part
+                if time_text.contains(":") {
+                    let cleaned = time_text.replace("Doors: ", "").replace("doors: ", "");
+                    record["event_time"] = serde_json::json!(cleaned);
+                }
+            }
+
+            // Extract age restriction
+            if let Some(age_elem) = event_element.select(&age_selector).next() {
+                let age_text = age_elem.text().collect::<String>().trim().to_string();
+                record["age_restriction"] = serde_json::json!(age_text);
+            }
+
+            // Set venue to Neumos
+            record["venue"] = serde_json::json!("Neumos");
+
+            // Extract ticket purchase link
+            if let Some(ticket_elem) = event_element.select(&ticket_link_selector).next() {
+                if let Some(href) = ticket_elem.value().attr("href") {
+                    record["ticket_url"] = serde_json::json!(href);
+                }
+                // Check if tickets are on sale
+                let class_attr = ticket_elem.value().attr("class").unwrap_or("");
+                record["tickets_on_sale"] = serde_json::json!(class_attr.contains("onsalenow"));
+            }
+
+            // Extract event image
+            if let Some(img_elem) = event_element.select(&image_selector).next() {
+                if let Some(src) = img_elem.value().attr("src") {
+                    record["image_url"] = serde_json::json!(src);
+                }
+            }
+
+            // Mark all events as public
+            record["public"] = serde_json::json!(true);
+            record["source"] = serde_json::json!("neumos");
+
+            // Only add if we have at least a title or date
+            if record.get("title").is_some() || record.get("event_day").is_some() {
+                out.push(ParsedRecord {
+                    source_id: self.source_id.clone(),
+                    envelope_id: self.envelope_id.clone(),
+                    payload_ref: self.payload_ref.clone(),
+                    record_path: "div.eventItem".to_string(),
+                    record,
+                });
+            }
+        }
+        
+        if out.is_empty() {
+            warn!("NeumosHtmlV1Parser: no events extracted; emitting fallback record with html_len={}", html.len());
+            out.push(ParsedRecord {
+                source_id: self.source_id.clone(),
+                envelope_id: self.envelope_id.clone(),
+                payload_ref: self.payload_ref.clone(),
+                record_path: "html".to_string(),
+                record: serde_json::json!({"html_len": html.len()}),
+            });
+        } else {
+            info!("NeumosHtmlV1Parser: extracted events count={}", out.len());
+        }
+        Ok(out)
+    }
+}

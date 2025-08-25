@@ -149,7 +149,75 @@ impl SourceNormalizer for YourSourceNormalizer {
 
 **Normalizer Registration**: Register your normalizer in the normalization registry (`src/pipeline/processing/normalize/registry.rs`) so it can be found by source ID.
 
-#### 7. Testing and Validation
+#### 7. Register the Crawler in main.rs
+
+The new crawler must be registered in the main binary so it can be executed:
+
+**Add Import**: Add an import for your new crawler at the top of `src/main.rs`:
+```rust
+use crate::apis::your_venue::YourVenueCrawler;
+```
+
+**Register in create_api()**: Add your crawler to the `create_api()` function:
+```rust
+fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
+    use crate::common::constants;
+    match api_name {
+        // ... existing crawlers ...
+        constants::YOUR_VENUE_API => Some(Box::new(YourVenueCrawler::new())),
+        _ => None,
+    }
+}
+```
+
+**Update CLI Documentation**: Update the help text in the command definitions to include your new source in the list of available sources. Look for strings like "Available: blue_moon, sea_monster..." and add your source name.
+
+#### 8. Ensure Proper Venue-Event Linking
+
+When creating events in your normalizer, proper venue linking is critical for database relationships:
+
+**Generate Deterministic Venue ID**: Create a consistent UUID for your venue based on its slug:
+```rust
+let venue_slug = "your-venue";
+let venue_id = Uuid::new_v5(&Uuid::NAMESPACE_DNS, venue_slug.as_bytes());
+```
+
+**Use Consistent IDs**: 
+- When creating the venue entity, set `id: Some(venue_id)`
+- When creating event entities, set `venue_id: venue_id` (NOT `Uuid::nil()`)
+- This ensures the database foreign key relationships work correctly
+
+**Example**:
+```rust
+// Generate venue ID once
+let venue_slug = "your-venue";
+let venue_id = Uuid::new_v5(&Uuid::NAMESPACE_DNS, venue_slug.as_bytes());
+
+// Create venue with this ID
+let venue = Venue {
+    id: Some(venue_id),
+    name: "Your Venue".to_string(),
+    slug: venue_slug.to_string(),
+    // ... other fields
+};
+
+// Create events linked to this venue
+let event = Event {
+    id: None,  // Let the system generate event ID
+    venue_id,  // Use the same venue_id, NOT Uuid::nil()
+    // ... other fields
+};
+```
+
+#### 9. Update Demo Binaries (Optional)
+
+If your project includes demo binaries like `demo-full-pipeline.rs`:
+
+**Add to Source Lists**: Include your source ID in any hardcoded lists of available sources
+
+**Register Components**: Import and register your normalizer if the demo uses it directly
+
+#### 10. Testing and Validation
 
 Before deploying a new data source, comprehensive testing ensures it works correctly:
 
@@ -159,6 +227,24 @@ Before deploying a new data source, comprehensive testing ensures it works corre
 - **Edge Case Testing**: Test with unusual but valid data like very long titles, special characters, or extreme dates
 
 Testing should cover both successful scenarios and failure modes to ensure the system remains stable even when external sources behave unexpectedly.
+
+**Running the Full Pipeline**: Test your complete implementation with:
+```bash
+# Run with database storage
+cargo run --features db --bin sms_scraper -- full-pipeline --source-id your_venue --use-database --bypass-cadence
+
+# Run with in-memory storage (for testing)
+cargo run --bin sms_scraper -- full-pipeline --source-id your_venue --bypass-cadence
+```
+
+**Database Management During Testing**: To clean up test data without affecting other sources:
+```bash
+# Delete only your venue's data
+cargo run --features db --bin sms_scraper -- clear-db --venue-slug your-venue
+
+# Or clear entire database (use with caution)
+cargo run --features db --bin sms_scraper -- clear-db
+```
 
 ### Understanding the Data Journey
 

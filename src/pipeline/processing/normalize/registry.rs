@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use anyhow::Result;
 
-use super::normalizers::{SourceNormalizer, MetricsNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer, KexpNormalizer, BarbozaNormalizer};
+use super::normalizers::{SourceNormalizer, MetricsNormalizer, SeaMonsterNormalizer, DarrellsTavernNormalizer, BlueMoonNormalizer, KexpNormalizer, BarbozaNormalizer, NeumosNormalizer};
 use crate::observability::metrics;
 use super::NormalizedRecord;
 use crate::pipeline::processing::parser::ParsedRecord;
@@ -27,6 +27,8 @@ impl NormalizationRegistry {
             Box::new(MetricsNormalizer::new(KexpNormalizer::new())));
         normalizers.insert("barboza".to_string(), 
             Box::new(MetricsNormalizer::new(BarbozaNormalizer::new())));
+        normalizers.insert("neumos".to_string(), 
+            Box::new(MetricsNormalizer::new(NeumosNormalizer::new())));
         
         Self {
             normalizers,
@@ -76,6 +78,7 @@ mod tests {
         assert!(sources.contains(&"blue_moon"));
         assert!(sources.contains(&"kexp"));
         assert!(sources.contains(&"barboza"));
+        assert!(sources.contains(&"neumos"));
     }
 
     #[test]

@@ -201,6 +201,203 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Delete a venue and all its related data by venue slug
+    pub async fn delete_venue_data(&self, venue_slug: &str) -> Result<()> {
+        let conn = self.get_connection().await?;
+        
+        // First, find the venue by slug in the data JSON
+        let mut rows = conn.query(
+            "SELECT id, data FROM nodes WHERE label = 'venue'",
+            libsql::params![]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to query venues: {e}")
+        })?;
+        
+        let mut venue_id: Option<String> = None;
+        while let Some(row) = rows.next().await.map_err(|e| ScraperError::Database {
+            message: format!("Failed to read row: {e}"),
+        })? {
+            let id: String = row.get(0).map_err(|e| ScraperError::Database {
+                message: format!("Failed to get id: {e}"),
+            })?;
+            let data: String = row.get(1).map_err(|e| ScraperError::Database {
+                message: format!("Failed to get data: {e}"),
+            })?;
+            
+            // Parse the JSON data to check the slug
+            if let Ok(venue_data) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(slug) = venue_data.get("slug").and_then(|s| s.as_str()) {
+                    if slug == venue_slug {
+                        venue_id = Some(id);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        let venue_id = venue_id.ok_or_else(|| ScraperError::Database {
+            message: format!("Venue with slug '{}' not found", venue_slug),
+        })?;
+        
+        info!("Found venue '{}' with ID: {}", venue_slug, venue_id);
+        
+        // Find all events connected to this venue (where venue is source of 'hosts' edge)
+        let mut event_ids = Vec::new();
+        let mut rows = conn.query(
+            "SELECT target_id FROM edges WHERE source_id = ? AND relation = 'hosts'",
+            libsql::params![venue_id.clone()]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to query venue events: {e}")
+        })?;
+        
+        while let Some(row) = rows.next().await.map_err(|e| ScraperError::Database {
+            message: format!("Failed to read row: {e}"),
+        })? {
+            let event_id: String = row.get(0).map_err(|e| ScraperError::Database {
+                message: format!("Failed to get event_id: {e}"),
+            })?;
+            event_ids.push(event_id);
+        }
+        
+        info!("Found {} events for venue '{}'", event_ids.len(), venue_slug);
+        
+        // Find all artists connected to these events
+        let mut artist_ids = std::collections::HashSet::new();
+        for event_id in &event_ids {
+            let mut rows = conn.query(
+                "SELECT source_id FROM edges WHERE target_id = ? AND relation = 'performs_at'",
+                libsql::params![event_id.clone()]
+            )
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to query event artists: {e}")
+            })?;
+            
+            while let Some(row) = rows.next().await.map_err(|e| ScraperError::Database {
+                message: format!("Failed to read row: {e}"),
+            })? {
+                let artist_id: String = row.get(0).map_err(|e| ScraperError::Database {
+                    message: format!("Failed to get artist_id: {e}"),
+                })?;
+                artist_ids.insert(artist_id);
+            }
+        }
+        
+        info!("Found {} unique artists for venue '{}'", artist_ids.len(), venue_slug);
+        
+        // Now delete everything in order:
+        // 1. Delete all edges related to the venue, events, and artists
+        conn.execute(
+            "DELETE FROM edges WHERE source_id = ? OR target_id = ?",
+            libsql::params![venue_id.clone(), venue_id.clone()]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to delete venue edges: {e}")
+        })?;
+        
+        // 2. Delete edges for all events
+        for event_id in &event_ids {
+            conn.execute(
+                "DELETE FROM edges WHERE source_id = ? OR target_id = ?",
+                libsql::params![event_id.clone(), event_id.clone()]
+            )
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to delete event edges: {e}")
+            })?;
+        }
+        
+        // 3. Delete edges for all artists (only if they're not connected to other venues)
+        for artist_id in &artist_ids {
+            // Check if this artist performs at events from other venues
+            let mut rows = conn.query(
+                "SELECT e.target_id FROM edges e 
+                 JOIN edges v ON e.target_id = v.target_id 
+                 WHERE e.source_id = ? AND e.relation = 'performs_at' 
+                 AND v.relation = 'hosts' AND v.source_id != ?",
+                libsql::params![artist_id.clone(), venue_id.clone()]
+            )
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to check artist connections: {e}")
+            })?;
+            
+            let has_other_venues = rows.next().await.map_err(|e| ScraperError::Database {
+                message: format!("Failed to read row: {e}"),
+            })?.is_some();
+            
+            if !has_other_venues {
+                // Delete artist edges if not connected to other venues
+                conn.execute(
+                    "DELETE FROM edges WHERE source_id = ? OR target_id = ?",
+                    libsql::params![artist_id.clone(), artist_id.clone()]
+                )
+                .await
+                .map_err(|e| ScraperError::Database {
+                    message: format!("Failed to delete artist edges: {e}")
+                })?;
+            }
+        }
+        
+        // 4. Delete event nodes
+        for event_id in &event_ids {
+            conn.execute(
+                "DELETE FROM nodes WHERE id = ?",
+                libsql::params![event_id.clone()]
+            )
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to delete event node: {e}")
+            })?;
+        }
+        
+        // 5. Delete artist nodes (only if not connected to other venues)
+        for artist_id in &artist_ids {
+            // Check again if artist has other connections
+            let mut rows = conn.query(
+                "SELECT id FROM edges WHERE (source_id = ? OR target_id = ?) LIMIT 1",
+                libsql::params![artist_id.clone(), artist_id.clone()]
+            )
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to check artist edges: {e}")
+            })?;
+            
+            let has_edges = rows.next().await.map_err(|e| ScraperError::Database {
+                message: format!("Failed to read row: {e}"),
+            })?.is_some();
+            
+            if !has_edges {
+                conn.execute(
+                    "DELETE FROM nodes WHERE id = ?",
+                    libsql::params![artist_id.clone()]
+                )
+                .await
+                .map_err(|e| ScraperError::Database {
+                    message: format!("Failed to delete artist node: {e}")
+                })?;
+            }
+        }
+        
+        // 6. Delete the venue node
+        conn.execute(
+            "DELETE FROM nodes WHERE id = ?",
+            libsql::params![venue_id.clone()]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to delete venue node: {e}")
+        })?;
+        
+        info!("Successfully deleted venue '{}' and related data", venue_slug);
+        Ok(())
+    }
+
     /// Get edges for a node
     pub async fn get_edges_for_node(
         &self,

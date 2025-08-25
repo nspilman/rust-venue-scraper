@@ -13,6 +13,7 @@ impl ParserFactory for DefaultParserFactory {
             "parse_plan:darrells_html_v1" => Some(Box::new(DarrellsHtmlAdapter)),
             "parse_plan:kexp_html_v1" => Some(Box::new(KexpHtmlAdapter)),
             "parse_plan:barboza_html_v1" => Some(Box::new(BarbozaHtmlAdapter)),
+            "parse_plan:neumos_html_v1" => Some(Box::new(NeumosHtmlAdapter)),
             _ => None,
         }
     }
@@ -23,6 +24,7 @@ struct WixWarmupAdapter;
 struct DarrellsHtmlAdapter;
 struct KexpHtmlAdapter;
 struct BarbozaHtmlAdapter;
+struct NeumosHtmlAdapter;
 
 #[async_trait]
 impl ParserPort for WixCalendarAdapter {
@@ -99,3 +101,17 @@ impl ParserPort for BarbozaHtmlAdapter {
     }
 }
 
+#[async_trait]
+impl ParserPort for NeumosHtmlAdapter {
+    async fn parse(&self, source_id: &str, envelope_id: &str, payload_ref: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
+        metrics::parser::batch_size(1); // Single parse operation
+        let inner_parser = crate::pipeline::processing::parser::NeumosHtmlV1Parser::new(
+            source_id.to_string(), 
+            envelope_id.to_string(), 
+            payload_ref.to_string()
+        );
+        let p = MetricsParser::new(inner_parser);
+        let recs = p.parse(bytes).map_err(|e| e.to_string())?;
+        recs.into_iter().map(|r| serde_json::to_string(&r).map_err(|e| e.to_string())).collect()
+    }
+}

@@ -26,6 +26,7 @@ use crate::apis::barboza::BarbozaCrawler;
 use crate::apis::blue_moon::BlueMoonCrawler;
 use crate::apis::darrells_tavern::DarrellsTavernCrawler;
 use crate::apis::kexp::KexpCrawler;
+use crate::apis::neumos::NeumosCrawler;
 use crate::apis::sea_monster::SeaMonsterCrawler;
 #[cfg(feature = "db")]
 use crate::db::DatabaseManager;
@@ -74,7 +75,7 @@ enum IngestLogCmd {
 enum Commands {
     /// Run the complete pipeline: Gateway → Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
     FullPipeline {
-        /// Source ID to process (e.g., blue_moon, sea_monster, darrells_tavern, kexp)
+        /// Source ID to process (e.g., blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos)
         #[arg(long)]
         source_id: String,
         /// Use database storage instead of in-memory
@@ -110,7 +111,7 @@ enum Commands {
     },
     /// Run the data ingestion process
     Ingester {
-        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp, barboza
+        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos
         #[arg(long)]
         apis: Option<String>,
         /// Use database storage instead of in-memory (requires LIBSQL_URL and LIBSQL_AUTH_TOKEN env vars)
@@ -135,7 +136,7 @@ enum Commands {
     /// One-off: fetch bytes for a source per registry, build envelope, persist CAS + envelope locally
     #[command(alias = "GatewayOnce")]
     GatewayOnce {
-        /// Source id to ingest (defaults to blue_moon, also available: kexp, sea_monster, darrells_tavern, barboza)
+        /// Source id to ingest (defaults to blue_moon, also available: kexp, sea_monster, darrells_tavern, barboza, neumos)
         #[arg(long)]
         source_id: Option<String>,
         /// Root data directory for CAS and ingest log (defaults to ./data)
@@ -152,15 +153,20 @@ enum Commands {
     },
     /// Architectural demo: ingest a single source via registry (ports/adapters)
     ArchIngestOnce {
-        /// Source id to ingest (e.g., blue_moon, kexp, sea_monster, darrells_tavern, barboza)
+        /// Source id to ingest (e.g., blue_moon, kexp, sea_monster, darrells_tavern, barboza, neumos)
         #[arg(long)]
         source_id: String,
         /// Data root (for CAS and ingest log)
         #[arg(long, default_value = "data")]
         data_root: String,
     },
-    /// Clear all data from the database (CAUTION: This will delete everything!)
-    ClearDb,
+    /// Clear data from the database
+    ClearDb {
+        /// Optional: Delete only data for a specific venue by slug (e.g., "neumos")
+        /// If not provided, will clear ALL data from the database
+        #[arg(long)]
+        venue_slug: Option<String>,
+    },
 }
 
 fn data_root_path_from_arg(data_root: &str) -> PathBuf {
@@ -181,6 +187,7 @@ fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
         constants::DARRELLS_TAVERN_API => Some(Box::new(DarrellsTavernCrawler::new())),
         constants::KEXP_API => Some(Box::new(KexpCrawler::new())),
         constants::BARBOZA_API => Some(Box::new(BarbozaCrawler::new())),
+        constants::NEUMOS_API => Some(Box::new(NeumosCrawler::new())),
         _ => None,
     }
 }
@@ -860,22 +867,40 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
                 }
             }
         }
-        Commands::ClearDb => {
-            println!("🗑️  Clearing all data from the database...");
-            println!("⚠️  WARNING: This will permanently delete all data!");
+        Commands::ClearDb { venue_slug } => {
             #[cfg(feature = "db")]
             {
                 // Load environment variables
                 dotenv::dotenv().ok();
                 let db_manager = DatabaseManager::new().await
                     .map_err(|e| format!("Failed to connect to database: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
-                match db_manager.clear_all_data().await {
-                    Ok(()) => {
-                        println!("✅ Database cleared successfully!");
+                
+                if let Some(slug) = venue_slug {
+                    println!("🗑️  Deleting data for venue '{}'...", slug);
+                    println!("⚠️  WARNING: This will permanently delete the venue and all its events!");
+                    
+                    match db_manager.delete_venue_data(&slug).await {
+                        Ok(()) => {
+                            println!("✅ Successfully deleted venue '{}' and all related data!", slug);
+                        }
+                        Err(e) => {
+                            error!("Failed to delete venue data: {}", e);
+                            println!("❌ Failed to delete venue data: {e}");
+                        }
                     }
-                    Err(e) => {
-                        error!("Failed to clear database: {}", e);
-                        println!("❌ Failed to clear database: {e}");
+                } else {
+                    println!("🗑️  Clearing ALL data from the database...");
+                    println!("⚠️  WARNING: This will permanently delete ALL data!");
+                    println!("💡 Tip: Use --venue-slug to delete data for a specific venue only");
+                    
+                    match db_manager.clear_all_data().await {
+                        Ok(()) => {
+                            println!("✅ Database cleared successfully!");
+                        }
+                        Err(e) => {
+                            error!("Failed to clear database: {}", e);
+                            println!("❌ Failed to clear database: {e}");
+                        }
                     }
                 }
             }
