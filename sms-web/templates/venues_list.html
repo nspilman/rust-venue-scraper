@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venues - Event Scraper</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <nav class="mb-6">
+                <div class="flex space-x-4">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 font-medium">Events</a>
+                    <span class="text-gray-400">•</span>
+                    <span class="text-gray-800 font-medium">Venues</span>
+                </div>
+            </nav>
+            
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Venues</h1>
+            <p class="text-gray-600">Browse all venues and click to see their upcoming events</p>
+        </header>
+
+        <!-- Venues Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {% for venue in venues %}
+            <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+                <a href="/venue/{{ venue.slug }}" class="block p-6 hover:bg-gray-50 transition-colors duration-200">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">{{ venue.name }}</h3>
+                    <p class="text-gray-600 text-sm mb-1">{{ venue.address }}</p>
+                    <p class="text-gray-500 text-sm">{{ venue.city }}</p>
+                    
+                    <div class="mt-4 text-blue-600 text-sm font-medium">
+                        View Events →
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</body>
+</html>

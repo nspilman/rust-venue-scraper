@@ -27,3 +27,9 @@ pub struct VenueTemplate {
     pub venue: WebVenue,
     pub events: Vec<WebEvent>,
 }
+
+#[derive(Template)]
+#[template(path = "venues_list.html")]
+pub struct VenuesListTemplate {
+    pub venues: Vec<WebVenue>,
+}

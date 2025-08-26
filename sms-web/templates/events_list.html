@@ -1,4 +1,4 @@
-{% if events.is_empty() %}
+{% if events.len() == 0 %}
     <div class="bg-white rounded-lg shadow-md p-8 text-center">
         <div class="text-gray-500">
             <svg class="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -30,7 +30,7 @@
                         <span class="truncate">
                             {% match event.venue %}
                                 {% when Some with (venue) %}
-                                    <a href="/venue/{{ venue.id }}" class="text-blue-600 hover:text-blue-800 hover:underline">{{ venue.name }}</a> - {{ venue.address }}
+                                    <a href="/venue/{{ venue.slug }}" class="text-blue-600 hover:text-blue-800 hover:underline">{{ venue.name }}</a> - {{ venue.address }}
                                 {% when None %}
                                     No venue info
                             {% endmatch %}
@@ -55,7 +55,7 @@
                         {% when None %}
                     {% endmatch %}
                     
-                    {% if !event.artists.is_empty() %}
+                    {% if event.artists.len() > 0 %}
                     <div class="flex items-center text-sm text-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>

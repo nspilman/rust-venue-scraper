@@ -5,10 +5,10 @@ use axum::{
 use axum::http::HeaderMap;
 use askama::Template;
 
-use crate::graphql::{fetch_artist, fetch_events, fetch_venue};
-use crate::models::{EventFilter, WebEvent, WebArtist, WebVenue};
+use crate::graphql::{fetch_artist, fetch_events, fetch_venue_by_slug, fetch_venues};
+use crate::models::{EventFilter, WebEvent};
 use crate::state::AppState;
-use crate::templates::{ArtistTemplate, EventsListTemplate, IndexTemplate, VenueTemplate};
+use crate::templates::{ArtistTemplate, EventsListTemplate, IndexTemplate, VenueTemplate, VenuesListTemplate};
 
 pub async fn index(State(state): State<AppState>) -> impl IntoResponse {
     let empty_filter = EventFilter {
@@ -83,18 +83,28 @@ pub async fn artist_page(
     Html(template.render().expect("Template rendering failed"))
 }
 
+pub async fn venues_list(State(state): State<AppState>) -> impl IntoResponse {
+    match fetch_venues(&state).await {
+        Ok(venues) => {
+            let template = VenuesListTemplate { venues };
+            Html(template.render().expect("Template rendering failed"))
+        }
+        Err(e) => Html(format!("<h1>Error loading venues: {}</h1>", e)),
+    }
+}
+
 pub async fn venue_page(
     State(state): State<AppState>,
-    Path(venue_id): Path<String>,
+    Path(venue_slug): Path<String>,
 ) -> impl IntoResponse {
-    // Fetch venue details
-    let venue = match fetch_venue(&state, &venue_id).await {
+    // Fetch venue details by slug
+    let venue = match fetch_venue_by_slug(&state, &venue_slug).await {
         Ok(Some(venue)) => venue,
         Ok(None) => return Html("<h1>Venue not found</h1>".to_string()),
         Err(e) => return Html(format!("<h1>Error fetching venue: {}</h1>", e)),
     };
 
-    // Fetch all events and filter for this venue
+    // Fetch all events and filter for this venue (still need to use venue ID for filtering)
     let filter = EventFilter { search: None, venue: None, limit: None, offset: None };
     let all_events = match fetch_events(&state, &filter, filter.limit, filter.offset).await {
         Ok(events) => events,
@@ -103,7 +113,7 @@ pub async fn venue_page(
 
     let venue_events: Vec<WebEvent> = all_events
         .into_iter()
-        .filter(|event| event.venue.as_ref().map_or(false, |v| v.id == venue_id))
+        .filter(|event| event.venue.as_ref().map_or(false, |v| v.id == venue.id))
         .collect();
 
     let template = VenueTemplate { venue, events: venue_events };

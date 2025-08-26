@@ -129,6 +129,13 @@ pub async fn fetch_events(state: &AppState, filter: &EventFilter, limit: Option<
         data.events
     };
 
+    // Add slugs to venues in events
+    for event in &mut events {
+        if let Some(ref mut venue) = event.venue {
+            venue.slug = WebVenue::create_slug(&venue.name);
+        }
+    }
+
     // Note: GraphQL API already filters for future events, so no additional filtering needed
 
     events.sort_by(|a, b| a.event_day.cmp(&b.event_day));
@@ -193,6 +200,64 @@ pub async fn fetch_artist(state: &AppState, artist_id: &str) -> Result<Option<We
     }
 }
 
+pub async fn fetch_venues(state: &AppState) -> Result<Vec<WebVenue>, String> {
+    let venues_query = r#"
+        query {
+            venues {
+                id
+                name
+                address
+                city
+            }
+        }
+    "#
+    .to_string();
+
+    let venues_request = GraphQLRequest {
+        query: venues_query,
+        variables: None,
+    };
+
+    let response = state
+        .graphql_client
+        .post(&state.graphql_url)
+        .json(&venues_request)
+        .send()
+        .await
+        .map_err(|e| format!("Error fetching venues: {}", e))?;
+
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Error reading venues response: {}", e))?;
+
+    let response_json: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Error parsing venues JSON: {} - Response: {}", e, response_text))?;
+
+    if let Some(errors) = response_json.get("errors") {
+        return Err(format!("GraphQL errors: {}", errors));
+    }
+
+    let venues_data = response_json
+        .get("data")
+        .and_then(|data| data.get("venues"))
+        .ok_or_else(|| format!("No venues data in response: {}", response_text))?;
+
+    let mut venues: Vec<WebVenue> = serde_json::from_value(venues_data.clone())
+        .map_err(|e| format!("Error deserializing venues: {}", e))?;
+
+    // Add slugs to venues
+    venues = venues.into_iter().map(|venue| venue.with_slug()).collect();
+
+    Ok(venues)
+}
+
+pub async fn fetch_venue_by_slug(state: &AppState, slug: &str) -> Result<Option<WebVenue>, String> {
+    // Since GraphQL API doesn't support venue by slug, we fetch all venues and find by slug
+    let venues = fetch_venues(state).await?;
+    Ok(venues.into_iter().find(|venue| venue.slug == slug))
+}
+
 pub async fn fetch_venue(state: &AppState, venue_id: &str) -> Result<Option<WebVenue>, String> {
     let venue_query = r#"
         query($id: ID!) {
@@ -242,7 +307,7 @@ pub async fn fetch_venue(state: &AppState, venue_id: &str) -> Result<Option<WebV
         } else {
             let venue: WebVenue = serde_json::from_value(venue_json)
                 .map_err(|e| format!("Error deserializing venue: {}", e))?;
-            Ok(Some(venue))
+            Ok(Some(venue.with_slug()))
         }
     } else {
         Ok(None)

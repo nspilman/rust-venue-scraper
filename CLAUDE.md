@@ -180,12 +180,13 @@ web-server/              # Separate web UI server project
 ## Docker Architecture
 
 ### Services Overview
-The system runs multiple containerized services:
+The system runs multiple decoupled containerized services:
 
 #### Core Application Services
-- **scraper** (`sms_scraper`): Main API server with GraphQL endpoint (port 8080) and metrics (port 9464)
-- **web** (`sms_web`): Web interface server (port 3001)
-- **ingester**: One-off job for data ingestion (disabled profile, run manually)
+- **graphql** (`sms-graphql`): Lightweight GraphQL API server (port 8080) - reads from shared database
+- **web** (`sms-web`): Web frontend server (port 3001) - communicates with GraphQL via HTTP
+- **scraper** (`sms-scraper`): Full scraper with processing pipeline (port 9898 for metrics) - writes to shared database
+- **scraper-job**: One-off scraper job (disabled profile, run manually)
 
 #### Monitoring Stack
 - **prometheus**: Metrics collection and storage (port 9090)
@@ -198,15 +199,22 @@ The system runs multiple containerized services:
 - `RUST_LOG`: Log level configuration
 - `SMS_PUSHGATEWAY_URL`: Pushgateway endpoint for metrics
 
+### Service Architecture
+- **Decoupled Design**: GraphQL API, web frontend, and scraper run independently
+- **Shared Database**: All services communicate via the shared Turso/libSQL database
+- **Service Profiles**: Scraper uses profile `["scraper"]` to run only when explicitly requested
+- **HTTP Communication**: Web frontend communicates with GraphQL API via HTTP
+
 ### Configuration Files
-- `docker-compose.yml`: Full production-like stack
+- `docker-compose.yml`: Full production-like stack with decoupled services
 - `docker-compose-local.yml`: Local development (monitoring only)
 - `ops/prometheus.yml`: Prometheus configuration
 - `ops/grafana/provisioning/`: Grafana dashboards and datasources
 
 ### Health Checks
-- Scraper service includes health check endpoint at `/health`
+- GraphQL service includes health check endpoint at `/health`
 - Services have proper dependency ordering and restart policies
+- Web service depends on GraphQL service health check
 
 ## Database Schema
 

@@ -27,6 +27,29 @@ pub struct WebVenue {
     pub name: String,
     pub address: String,
     pub city: String,
+    #[serde(skip)]
+    pub slug: String,
+}
+
+impl WebVenue {
+    pub fn create_slug(name: &str) -> String {
+        name.to_lowercase()
+            .chars()
+            .map(|c| match c {
+                'a'..='z' | '0'..='9' => c,
+                _ => '-',
+            })
+            .collect::<String>()
+            .split('-')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<&str>>()
+            .join("-")
+    }
+
+    pub fn with_slug(mut self) -> Self {
+        self.slug = Self::create_slug(&self.name);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -53,7 +53,9 @@ Once the services are running, you can access:
 
 **Health & Metrics**:
 - API health check: http://localhost:8080/health
-- Prometheus metrics: http://localhost:9464/metrics
+- Scraper metrics: http://localhost:9898/metrics
+- Pushgateway: http://localhost:9091
+- Prometheus: http://localhost:9090
 - Grafana dashboard: http://localhost:3000 (admin/admin)
 
 ### Database Setup (Optional)
@@ -88,8 +90,11 @@ cargo run --bin test_db
 # Run integration tests
 cargo run --bin test_integration
 
-# Run with metrics (includes server with /metrics endpoint)
+# Run GraphQL server
 cargo run -- server --port 8080
+
+# Run full scraper with metrics
+cargo run -- scraper
 ```
 
 ### 📊 Metrics & Observability
@@ -100,11 +105,17 @@ The scraper includes comprehensive Prometheus-compatible metrics:
 # Run complete pipeline demonstration with metrics
 ./demo-local.sh
 
-# View metrics in real-time
+# View scraper metrics in real-time
 curl http://localhost:9898/metrics
 
-# Start with Docker Compose (includes Prometheus + Grafana)
+# Start all services (GraphQL + Web)
 docker-compose up -d
+
+# Start services with scraper
+docker-compose --profile scraper up -d
+
+# Run one-off scraper job
+docker-compose run --rm scraper-job
 ```
 
 Metrics cover all pipeline phases:
