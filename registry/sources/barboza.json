@@ -1,20 +1,20 @@
 {
   "source_id": "barboza",
   "identity": { 
-    "name": "The Barboza Events Page", 
+    "name": "The Barboza Events AJAX API", 
     "owner_team": "ingestion", 
     "contact_email": "dataops@example.com" 
   },
   "enabled": true,
   "endpoints": [ 
     { 
-      "url": "https://www.thebarboza.com/events", 
+      "url": "https://www.thebarboza.com/events/events_ajax/12?venue=1&team=2&per_page=100&came_from_page=event-list-page", 
       "method": "GET" 
     } 
   ],
   "auth": { "method": "none" },
   "rate_limits": { 
-    "requests_per_min": 6, 
+    "requests_per_min": 10, 
     "bytes_per_min": 20000000, 
     "concurrency": 1 
   },
