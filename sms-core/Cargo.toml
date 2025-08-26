@@ -1,0 +1,27 @@
+[package]
+name = "sms-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared domain types and database models for SMS"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+
+# HTTP client (optional - only needed for full scraper, not GraphQL server)
+reqwest = { workspace = true, optional = true }
+
+# Database (optional)
+libsql = { workspace = true, optional = true }
+
+[features]
+default = []
+db = ["dep:libsql"]
+http = ["dep:reqwest"]

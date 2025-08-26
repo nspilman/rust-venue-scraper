@@ -70,8 +70,8 @@ impl Event {
     async fn venue(&self, ctx: &Context<'_>) -> FieldResult<Option<super::venue::Venue>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Get venue by ID from storage
-        match context.storage.get_venue_by_id(self.inner.venue_id).await {
+        // Use DataLoader to batch venue lookups
+        match context.venue_loader.load_one(self.inner.venue_id).await {
             Ok(Some(venue)) => Ok(Some(venue.into())),
             Ok(None) => Ok(None),
             Err(e) => Err(e.into()),
@@ -81,16 +81,19 @@ impl Event {
     /// Artists performing at this event
     async fn artists(&self, ctx: &Context<'_>) -> FieldResult<Vec<super::artist::Artist>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let mut artists = Vec::new();
-
+        
+        // Use DataLoader to batch artist lookups
+        let artists = context.artist_loader.load_many(self.inner.artist_ids.clone()).await
+            .map_err(|e| async_graphql::Error::new(format!("Failed to load artists: {}", e)))?;
+        
+        // Convert to GraphQL types, preserving order and skipping missing artists
+        let mut result = Vec::new();
         for artist_id in &self.inner.artist_ids {
-            match context.storage.get_artist_by_id(*artist_id).await {
-                Ok(Some(artist)) => artists.push(artist.into()),
-                Ok(None) => continue, // Skip missing artists
-                Err(e) => return Err(e.into()),
+            if let Some(artist) = artists.get(artist_id) {
+                result.push(artist.clone().into());
             }
         }
-
-        Ok(artists)
+        
+        Ok(result)
     }
 }

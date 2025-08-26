@@ -16,11 +16,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
 // GraphQL imports
-use crate::graphql::{
-    resolvers::Query,
-    schema::{GraphQLContext, GraphQLSchema},
-};
-use async_graphql::{EmptyMutation, EmptySubscription, Schema};
+use crate::graphql::schema::{create_schema, GraphQLSchema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 
 /// Health check endpoint
@@ -115,10 +111,8 @@ pub fn create_server(storage: Arc<dyn Storage>) -> Router {
         .allow_methods([Method::GET, Method::POST])
         .allow_headers(Any);
 
-    // Build GraphQL schema and attach storage in context
-    let schema: GraphQLSchema = Schema::build(Query, EmptyMutation, EmptySubscription)
-        .data(GraphQLContext { storage: storage.clone() })
-        .finish();
+    // Build GraphQL schema with DataLoaders
+    let schema = create_schema(storage.clone());
 
     Router::new()
         .route("/health", get(health))

@@ -1,0 +1,30 @@
+[package]
+name = "sms-web"
+version = "0.1.0"
+edition = "2021"
+description = "Web frontend for SMS - communicates with GraphQL API"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+
+# HTTP client for GraphQL requests
+reqwest = { workspace = true, features = ["json"] }
+
+# Web server  
+axum = { version = "0.7", features = ["macros"] }
+tower = { workspace = true }
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+
+# Templating
+askama = { version = "0.12", features = ["with-axum"] }
+askama_axum = "0.4"
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# Environment variables
+dotenv = "0.15"

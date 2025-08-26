@@ -4,6 +4,7 @@ use tracing::{error, info, warn};
 // Removed unused import HttpClientPort
 
 // Core modules
+#[cfg(feature = "scraping")]
 mod apis;
 mod common;
 #[cfg(feature = "db")]
@@ -22,11 +23,19 @@ mod infra;
 #[allow(dead_code)]
 mod architecture;
 
+#[cfg(feature = "scraping")]
 use crate::apis::barboza::BarbozaCrawler;
+#[cfg(feature = "scraping")]
 use crate::apis::blue_moon::BlueMoonCrawler;
+#[cfg(feature = "scraping")]
+use crate::apis::conor_byrne::ConorByrneCrawler;
+#[cfg(feature = "scraping")]
 use crate::apis::darrells_tavern::DarrellsTavernCrawler;
+#[cfg(feature = "scraping")]
 use crate::apis::kexp::KexpCrawler;
+#[cfg(feature = "scraping")]
 use crate::apis::neumos::NeumosCrawler;
+#[cfg(feature = "scraping")]
 use crate::apis::sea_monster::SeaMonsterCrawler;
 #[cfg(feature = "db")]
 use crate::db::DatabaseManager;
@@ -188,6 +197,7 @@ fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
         constants::KEXP_API => Some(Box::new(KexpCrawler::new())),
         constants::BARBOZA_API => Some(Box::new(BarbozaCrawler::new())),
         constants::NEUMOS_API => Some(Box::new(NeumosCrawler::new())),
+        constants::CONOR_BYRNE_API => Some(Box::new(ConorByrneCrawler::new())),
         _ => None,
     }
 }

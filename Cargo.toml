@@ -1,123 +1,28 @@
-[package]
-name = "sms_scraper"
-version = "0.1.0"
-edition = "2021"
-description = "Rust-based event data scraper for Seattle Music Scene"
-autobins = false
+[workspace]
+members = [
+    "sms-core",
+    "sms-scraper", 
+    "sms-graphql",
+    "sms-web"
+]
+resolver = "2"
 
-[[bin]]
-name = "sms_scraper"
-path = "src/main.rs"
-
-[[bin]]
-name = "build-dashboard"
-path = "src/bin/build-dashboard.rs"
-
-[[bin]]
-name = "demo-quality-gate-metrics"
-path = "src/bin/demo-quality-gate-metrics.rs"
-
-[[bin]]
-name = "demo-full-pipeline"
-path = "src/bin/demo-full-pipeline.rs"
-
-[[bin]]
-name = "validate-envelope"
-path = "src/bin/validate-envelope.rs"
-
-[[bin]]
-name = "diagnose-artist-links"
-path = "src/bin/diagnose-artist-links.rs"
-
-[[bin]]
-name = "clear-database"
-path = "src/bin/clear-database.rs"
-
-[[bin]]
-name = "check-artist-links"
-path = "src/bin/check-artist-links.rs"
-
-[dependencies]
-# Async runtime and HTTP client
+[workspace.dependencies]
+# Shared dependencies across all workspace members
 tokio = { version = "1.0", features = ["full"] }
-reqwest = { version = "0.11", features = ["json", "blocking", "gzip", "deflate"] }
-
-# Database - Turso/libSQL (optional, behind the `db` feature to keep builds small)
-libsql = { version = "0.4", optional = true }
-
-# Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.8"
-
-# Date and time handling
 chrono = { version = "0.4", features = ["serde"] }
-
-# HTML parsing for crawlers
-scraper = "0.19"
-select = "0.6"
-
-# Regular expressions
-regex = "1.10"
-
-# Error handling and logging
+uuid = { version = "1.0", features = ["v4", "v5", "serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "local-time"] }
-tracing-appender = "0.2"
-
-# Environment variables
-dotenv = "0.15"
-
-# Command line interface
-clap = { version = "4.0", features = ["derive"] }
-
-# UUID generation
-uuid = { version = "1.0", features = ["v4", "v5", "serde"] }
-
-# Async traits
 async-trait = "0.1"
 
-# GraphQL (pin to v6 to avoid edition 2024 requirement)
-async-graphql = { version = "6.0", features = ["chrono"] }
-async-graphql-axum = "6.0"
-# Use axum 0.6 to match async-graphql-axum v6 integration
-axum = { version = "0.6", features = ["json", "query", "tokio"] }
+# Database
+libsql = "0.4"
+
+# HTTP/Web
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+axum = "0.7"
 tower = "0.4"
-# HTTP server
-hyper = { version = "0.14", features = ["http1", "server", "tcp"] }
-# tower-http 0.4 works with axum 0.6
-tower-http = { version = "0.4", features = ["cors", "fs"] }
-
-# JSON Schema validation
-jsonschema = "0.17"
-
-# Crypto and utilities for CAS/idempotency
-sha2 = "0.10"
-hex = "0.4"
-
-# Local SQLite for ingest metadata (dedupe, offsets)
-# Use libsql's rusqlite-compatible fork to avoid linking a second SQLite (libsqlite3_sys)
-rusqlite = { package = "libsql-rusqlite", version = "0.31" }
-metrics = "0.23"
-metrics-exporter-prometheus = "0.13"
-
-# For lazy static metric catalog
-once_cell = "1.19"
-
-# Random number generation for demos
-rand = "0.8"
-
-[dev-dependencies]
-# Temporary files for testing
-tempfile = "3.0"
-
-[features]
-# Default build excludes database (Turso/libSQL) to minimize image size and build time.
-default = []
-# Enable Turso/libSQL-backed storage and related modules
-# Use dep: syntax so Cargo treats libsql as the optional dependency to enable
-db = ["dep:libsql"]
-
-

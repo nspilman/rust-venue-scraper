@@ -36,6 +36,26 @@ The scraper exhibits a modular and extensible architecture with clean separation
 
 ## 🚀 Usage
 
+### Quick Start - API Endpoints
+
+Once the services are running, you can access:
+
+**GraphQL API** (port 8080):
+- GraphQL Playground: http://localhost:8080/graphql
+- Raw GraphQL endpoint: `curl -X POST http://localhost:8080/graphql -H "Content-Type: application/json" -d '{"query":"{ events { id title venue { name } artists { name } } }"}'`
+
+**Web Interface** (port 3001):
+- Events listing: http://localhost:3001/events
+- Search events: http://localhost:3001/events?search=jazz
+- Filter by venue: http://localhost:3001/events?venue=neumos
+- View artist: http://localhost:3001/artist/[artist-id]
+- View venue: http://localhost:3001/venue/[venue-id]
+
+**Health & Metrics**:
+- API health check: http://localhost:8080/health
+- Prometheus metrics: http://localhost:9464/metrics
+- Grafana dashboard: http://localhost:3000 (admin/admin)
+
 ### Database Setup (Optional)
 
 For persistent storage, set up a Turso database:

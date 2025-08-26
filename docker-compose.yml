@@ -1,16 +1,14 @@
 services:
-  scraper:
+  # Lightweight GraphQL API server - reads from shared database
+  graphql:
     build: 
       context: .
-      dockerfile: Dockerfile
-    image: sms-scraper:latest
-    container_name: sms_scraper
+      dockerfile: sms-graphql/Dockerfile
+    image: sms-graphql:latest
+    container_name: sms_graphql
     ports:
       - "8080:8080"   # GraphQL API
-      - "9464:9464"   # Prometheus metrics endpoint
     environment:
-      - PROMETHEUS_ADDR=0.0.0.0:9464
-      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
       - RUST_LOG=info
       - LIBSQL_URL=${LIBSQL_URL}
       - LIBSQL_AUTH_TOKEN=${LIBSQL_AUTH_TOKEN}
@@ -20,42 +18,62 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
-    volumes:
-      - ./data:/app/data    # Persist scraper data
     restart: unless-stopped
-    command: ["/usr/local/bin/sms_scraper", "server", "--port", "8080"]
 
+  # Web frontend - communicates with GraphQL via HTTP
   web:
-    # Reuse the same image since both binaries are in it
-    image: sms-scraper:latest
+    build: 
+      context: .
+      dockerfile: sms-web/Dockerfile
+    image: sms-web:latest
     container_name: sms_web
-    depends_on:
-      scraper:
-        condition: service_healthy
-    environment:
-      - PORT=3001
-      - GRAPHQL_URL=http://scraper:8080/graphql
     ports:
       - "3001:3001"
-    command: ["/usr/local/bin/web-server"]
-
-  # One-off ingester job, run with: docker compose run --rm ingester
-  ingester:
-    image: sms-scraper:latest
-    profiles: ["disabled"]
     environment:
-      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
-      - PROMETHEUS_ADDR=0.0.0.0:9898
-      - RUST_LOG=info
+      - PORT=3001
+      - GRAPHQL_URL=http://graphql:8080/graphql
+    depends_on:
+      graphql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Full scraper with processing pipeline - writes to shared database
+  scraper:
+    build: 
+      context: .
+      dockerfile: sms-scraper/Dockerfile
+    image: sms-scraper:latest
+    container_name: sms_scraper
+    profiles: ["scraper"]  # Only run when explicitly requested
     ports:
-      - "9898:9898"
+      - "9898:9898"   # Metrics endpoint
+    environment:
+      - RUST_LOG=info
+      - LIBSQL_URL=${LIBSQL_URL}
+      - LIBSQL_AUTH_TOKEN=${LIBSQL_AUTH_TOKEN}
+      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
     volumes:
       - ./data:/app/data
     depends_on:
       - pushgateway
-    entrypoint: ["/usr/local/bin/sms_scraper"]
-    command: ["ingester", "--apis", "blue_moon", "--bypass-cadence"]
+    restart: unless-stopped
 
+  # One-off scraper job
+  scraper-job:
+    image: sms-scraper:latest
+    profiles: ["disabled"]
+    environment:
+      - SMS_PUSHGATEWAY_URL=http://pushgateway:9091
+      - RUST_LOG=info
+      - LIBSQL_URL=${LIBSQL_URL}
+      - LIBSQL_AUTH_TOKEN=${LIBSQL_AUTH_TOKEN}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - pushgateway
+    command: ["ingester", "--apis", "blue_moon,sea_monster", "--bypass-cadence"]
+
+  # Monitoring stack
   pushgateway:
     image: prom/pushgateway:latest
     container_name: pushgateway
@@ -77,7 +95,7 @@ services:
     ports:
       - "9090:9090"
     depends_on:
-      scraper:
+      graphql:
         condition: service_healthy
 
   grafana:
@@ -91,7 +109,6 @@ services:
       - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
-      - scraper
 
 volumes:
   prometheus_data:

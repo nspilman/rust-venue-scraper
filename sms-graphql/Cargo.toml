@@ -1,0 +1,35 @@
+[package]
+name = "sms-graphql"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight GraphQL API server for SMS"
+
+[dependencies]
+sms-core = { path = "../sms-core", features = ["db"] }
+
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# GraphQL
+async-graphql = { version = "6.0", features = ["chrono", "dataloader"] }
+async-graphql-axum = "6.0"
+
+# HTTP server
+axum = { version = "0.7", features = ["json"] }
+tower = { workspace = true }
+tower-http = { version = "0.4", features = ["cors", "fs"] }
+hyper = { version = "0.14", features = ["server", "tcp"] }
+
+# CLI
+clap = { version = "4.0", features = ["derive"] }
+
+# Environment 
+dotenv = "0.15"

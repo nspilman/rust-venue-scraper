@@ -1,0 +1,33 @@
+{
+  "source_id": "conor_byrne",
+  "identity": { 
+    "name": "Conor Byrne Events Calendar", 
+    "owner_team": "ingestion", 
+    "contact_email": "dataops@example.com" 
+  },
+  "enabled": true,
+  "endpoints": [ 
+    { 
+      "url": "https://www.venuepilot.co/graphql", 
+      "method": "POST" 
+    } 
+  ],
+  "auth": { "method": "none" },
+  "rate_limits": { 
+    "requests_per_min": 6, 
+    "bytes_per_min": 20000000, 
+    "concurrency": 1 
+  },
+  "content": { 
+    "allowed_mime_types": ["application/json", "text/html"],
+    "max_payload_size_bytes": 20000000 
+  },
+  "policy": { 
+    "license_id": "terms-unknown", 
+    "robots_tos_posture": "respect", 
+    "pii_risk_class": "low", 
+    "pii_action": "allow" 
+  },
+  "change_detection": { "strategy": "snapshot" },
+  "parse_plan_ref": "parse_plan:venuepilot_graphql_v1"
+}

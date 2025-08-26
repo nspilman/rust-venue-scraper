@@ -57,16 +57,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "sea_monster" => constants::SEA_MONSTER_API,
             "darrells_tavern" => constants::DARRELLS_TAVERN_API,
             "neumos" => constants::NEUMOS_API,
+            "conor_byrne" => constants::CONOR_BYRNE_API,
             _ => {
                 println!("❌ Unknown source: {}", args[1]);
-                println!("Available sources: barboza, blue_moon, kexp, neumos, sea_monster, darrells_tavern");
+                println!("Available sources: barboza, blue_moon, kexp, neumos, sea_monster, darrells_tavern, conor_byrne");
                 return Ok(());
             }
         }
     } else {
         println!("ℹ️  No source specified, using default: blue_moon");
         println!("Usage: {} <source_id> [--use-database]", args[0]);
-        println!("Available sources: barboza, blue_moon, kexp, neumos, sea_monster, darrells_tavern");
+        println!("Available sources: barboza, blue_moon, kexp, neumos, sea_monster, darrells_tavern, conor_byrne");
         println!("Options:");
         println!("  --use-database  Use database storage instead of in-memory");
         constants::BLUE_MOON_API
