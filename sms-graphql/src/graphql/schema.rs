@@ -1,8 +1,8 @@
 use crate::graphql::loaders::{ArtistLoader, VenueLoader};
-use crate::graphql::resolvers::Query;
+use crate::graphql::resolvers::{Query, Mutation};
 use sms_core::storage::Storage;
 use async_graphql::dataloader::DataLoader;
-use async_graphql::{EmptyMutation, EmptySubscription, Schema};
+use async_graphql::{EmptySubscription, Schema};
 use std::sync::Arc;
 
 /// GraphQL context containing shared application state
@@ -14,7 +14,7 @@ pub struct GraphQLContext {
 
 /// The complete GraphQL schema
 #[allow(dead_code)]
-pub type GraphQLSchema = Schema<Query, EmptyMutation, EmptySubscription>;
+pub type GraphQLSchema = Schema<Query, Mutation, EmptySubscription>;
 
 /// Create a new GraphQL schema with the given storage
 #[allow(dead_code)]
@@ -22,7 +22,7 @@ pub fn create_schema(storage: Arc<dyn Storage>) -> GraphQLSchema {
     let venue_loader = VenueLoader::new(storage.clone());
     let artist_loader = ArtistLoader::new(storage.clone());
     
-    Schema::build(Query, EmptyMutation, EmptySubscription)
+    Schema::build(Query, Mutation, EmptySubscription)
         .data(GraphQLContext { 
             storage,
             venue_loader,

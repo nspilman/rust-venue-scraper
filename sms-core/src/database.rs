@@ -437,4 +437,31 @@ impl DatabaseManager {
 
         Ok(results)
     }
+
+    /// Delete a node by ID
+    pub async fn delete_node(&self, node_id: &str) -> Result<()> {
+        let conn = self.get_connection().await?;
+        
+        // First delete all edges related to this node
+        conn.execute(
+            "DELETE FROM edges WHERE source_id = ? OR target_id = ?",
+            libsql::params![node_id, node_id]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to delete edges for node {}: {}", node_id, e),
+        })?;
+        
+        // Then delete the node itself
+        conn.execute(
+            "DELETE FROM nodes WHERE id = ?",
+            libsql::params![node_id]
+        )
+        .await
+        .map_err(|e| ScraperError::Database {
+            message: format!("Failed to delete node {}: {}", node_id, e),
+        })?;
+        
+        Ok(())
+    }
 }

@@ -830,4 +830,18 @@ impl Storage for DatabaseStorage {
         
         Ok(artists)
     }
+
+    async fn delete_event(&self, event_id: Uuid) -> Result<()> {
+        debug!("Deleting event with ID: {}", event_id);
+        
+        // Delete the event node from the database
+        self.db
+            .delete_node(&event_id.to_string())
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to delete event node: {e}"),
+            })?;
+            
+        Ok(())
+    }
 }

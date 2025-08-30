@@ -26,6 +26,7 @@ pub trait Storage: Send + Sync {
         title: &str
     ) -> Result<Option<Event>>;
     async fn update_event(&self, event: &Event) -> Result<()>;
+    async fn delete_event(&self, event_id: Uuid) -> Result<()>;
     
     // Raw data operations
     async fn create_raw_data(&self, raw_data: &mut RawData) -> Result<()>;

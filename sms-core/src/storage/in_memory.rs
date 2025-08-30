@@ -346,4 +346,11 @@ impl Storage for InMemoryStorage {
             .collect();
         Ok(result)
     }
+
+    async fn delete_event(&self, event_id: Uuid) -> Result<()> {
+        let mut events = self.events.lock().unwrap();
+        events.remove(&event_id);
+        debug!("Deleted event with ID: {}", event_id);
+        Ok(())
+    }
 }

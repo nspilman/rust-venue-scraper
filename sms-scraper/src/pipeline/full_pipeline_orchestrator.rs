@@ -110,30 +110,39 @@ impl FullPipelineOrchestrator {
         debug!("Processing raw data item: {} ({})", raw_data.event_name, raw_data.api_name);
         
         // Step 1: Parse - Convert raw HTML/JSON to structured events
+        info!("📄 Step 1: Parse");
         let parsed_events = self.parse_raw_data(raw_data).await?;
         
-        debug!("Parsed {} events from raw data", parsed_events.len());
+        info!("✅ Parsed {} events from raw data", parsed_events.len());
         
         // Process each parsed event through the pipeline
         for parsed_data in parsed_events {
+            info!("🔄 Processing event: {}", parsed_data.event_args.title);
+            
             // Step 2: Normalize - Standardize data format
+            info!("📝 Step 2: Normalize");
             let normalized_data = self.normalize_parsed_data(&parsed_data).await?;
             
             // Step 3: Quality Gate - Check data quality and completeness
+            info!("✅ Step 3: Quality Gate");
             let quality_result = self.quality_gate_check(&normalized_data).await?;
             if !quality_result.passed {
-                debug!("Quality gate failed for {}: {}", normalized_data.title, quality_result.reason);
+                info!("❌ Quality gate failed for {}: {}", normalized_data.title, quality_result.reason);
                 continue; // Skip this event, continue with next
             }
             
             // Step 4: Enrich - Add additional data and context
+            info!("🔍 Step 4: Enrich");
             let enriched_data = self.enrich_data(&normalized_data).await?;
             
             // Step 5: Conflation - Resolve entity relationships
+            info!("🔗 Step 5: Conflation");
             let conflated_data = self.conflate_entities(&enriched_data).await?;
             
             // Step 6: Catalog - Store final entities in database
+            info!("📚 Step 6: Catalog");
             self.catalog_entities(&conflated_data).await?;
+            info!("✅ Event cataloged: {}", normalized_data.title);
         }
 
         Ok(())
@@ -275,6 +284,7 @@ impl FullPipelineOrchestrator {
 
         // Extract and link artists from the event title
         let artist_ids = self.get_artist_ids_from_title(&normalized.title).await?;
+        debug!("Found {} artist IDs for event: {}", artist_ids.len(), normalized.title);
 
         // Create new event
         let mut event = Event {
@@ -330,19 +340,30 @@ impl FullPipelineOrchestrator {
 
     /// Extract and ensure artists exist from event title
     async fn ensure_artists_from_title(&self, title: &str) -> Result<()> {
-        // Simple artist extraction - could be enhanced
-        let potential_artists: Vec<&str> = title
-            .split(&[',', '&', '+', '/', '|'][..])
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let mut potential_artists = Vec::new();
+        
+        // Handle KEXP-specific format: "Artist Name LIVE on KEXP (OPEN TO THE PUBLIC)"
+        if title.contains("LIVE on KEXP") {
+            if let Some(artist_part) = title.split(" LIVE on KEXP").next() {
+                let artist_name = artist_part.trim();
+                if !artist_name.is_empty() && artist_name.len() > 2 {
+                    potential_artists.push(artist_name);
+                }
+            }
+        } else {
+            // Fallback to general parsing for other venues
+            potential_artists = title
+                .split(&[',', '&', '+', '/', '|'][..])
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+        }
 
         for artist_name in potential_artists {
-            // Skip common venue/event words
+            // Skip common venue/event words (but not "live" for KEXP since we handle it above)
             let lower = artist_name.to_lowercase();
             if lower.contains("presents") || lower.contains("show") || 
-               lower.contains("concert") || lower.contains("live") ||
-               lower.len() < 2 {
+               lower.contains("concert") || lower.len() < 2 {
                 continue;
             }
 
@@ -404,20 +425,32 @@ impl FullPipelineOrchestrator {
     
     /// Extract artist IDs from event title (assumes artists have already been created)
     async fn get_artist_ids_from_title(&self, title: &str) -> Result<Vec<Uuid>> {
-        let potential_artists: Vec<&str> = title
-            .split(&[',', '&', '+', '/', '|'][..])
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let mut potential_artists = Vec::new();
+        
+        // Handle KEXP-specific format: "Artist Name LIVE on KEXP (OPEN TO THE PUBLIC)"
+        if title.contains("LIVE on KEXP") {
+            if let Some(artist_part) = title.split(" LIVE on KEXP").next() {
+                let artist_name = artist_part.trim();
+                if !artist_name.is_empty() && artist_name.len() > 2 {
+                    potential_artists.push(artist_name);
+                }
+            }
+        } else {
+            // Fallback to general parsing for other venues
+            potential_artists = title
+                .split(&[',', '&', '+', '/', '|'][..])
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+        }
 
         let mut artist_ids = Vec::new();
         
         for artist_name in potential_artists {
-            // Skip common venue/event words
+            // Skip common venue/event words (but not "live" for KEXP since we handle it above)
             let lower = artist_name.to_lowercase();
             if lower.contains("presents") || lower.contains("show") || 
-               lower.contains("concert") || lower.contains("live") ||
-               lower.len() < 2 {
+               lower.contains("concert") || lower.len() < 2 {
                 continue;
             }
 
