@@ -1,7 +1,7 @@
 use crate::pipeline::ingestion::envelope::{
     ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
 };
-use crate::common::error::{Result, ScraperError};
+use sms_core::common::error::{Result, ScraperError};
 use crate::pipeline::ingestion::gateway::Gateway;
 use crate::pipeline::ingestion::idempotency::compute_idempotency_key;
 use crate::pipeline::ingestion::ingest_meta::IngestMeta;
@@ -18,7 +18,7 @@ use tracing::debug;
 /// safety checks, idempotency, gateway accept, and cadence update) so individual ingestors can focus on parsing.
 pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     // 1) Load registry entry
-    let reg_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let reg_path = Path::new(".")
         .join("registry/sources")
         .join(format!("{}.json", source_id));
 
@@ -45,7 +45,7 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     })?;
 
     // 2) Cadence: enforce at most twice/day per source (unless bypassed)
-    let data_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
+    let data_root = Path::new(".").join("data");
     let bypass_cadence = std::env::var("SMS_BYPASS_CADENCE")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);

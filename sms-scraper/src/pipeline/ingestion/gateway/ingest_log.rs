@@ -68,7 +68,16 @@ fn ensure_symlink_to_current(link_path: &Path, target_path: &Path) -> anyhow::Re
             }
         }
         if needs_update {
-            let _ = fs::remove_file(link_path);
+            // Attempt to remove as file; if it's actually a directory, remove that
+            if let Err(e) = fs::remove_file(link_path) {
+                // On Unix, removing a directory as a file yields IsADirectory
+                // Fall back to removing directory tree
+                let _ = fs::remove_dir_all(link_path);
+                // If both removals fail, surface the original error
+                if link_path.exists() {
+                    return Err(e.into());
+                }
+            }
         } else {
             return Ok(());
         }
@@ -76,9 +85,40 @@ fn ensure_symlink_to_current(link_path: &Path, target_path: &Path) -> anyhow::Re
     // Create a relative symlink if possible for portability
     // Use absolute target to avoid dependency on path diffing
     #[cfg(unix)]
-    std::os::unix::fs::symlink(target_path, link_path)?;
+    {
+        match std::os::unix::fs::symlink(target_path, link_path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                // If it already exists, ensure it points to the right target; otherwise, replace
+                if let Ok(curr_target) = fs::read_link(link_path) {
+                    if paths_equivalent(&curr_target, target_path) {
+                        return Ok(());
+                    }
+                }
+                let _ = fs::remove_file(link_path);
+                let _ = fs::remove_dir_all(link_path);
+                std::os::unix::fs::symlink(target_path, link_path)?;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(target_path, link_path)?;
+    {
+        match std::os::windows::fs::symlink_file(target_path, link_path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                if let Ok(curr_target) = fs::read_link(link_path) {
+                    if paths_equivalent(&curr_target, target_path) {
+                        return Ok(());
+                    }
+                }
+                let _ = fs::remove_file(link_path);
+                let _ = fs::remove_dir_all(link_path);
+                std::os::windows::fs::symlink_file(target_path, link_path)?;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
     Ok(())
 }
 

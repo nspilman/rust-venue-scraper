@@ -31,7 +31,11 @@ The scraper exhibits a modular and extensible architecture with clean separation
 
 ## Current API Implementations
 
+- **Neumos**: Seattle venue event scraping
+- **Barboza**: Capitol Hill venue data extraction
 - **Blue Moon**: Venue-specific event scraping
+- **Conor Byrne**: Ballard pub event data
+- **KEXP**: Radio station event listings
 - **Sea Monster**: Lounge event data extraction
 
 ## 🚀 Usage
@@ -77,24 +81,26 @@ cp .env.example .env
 # Build the project
 cargo build
 
-# Run ingester only (in-memory)
-cargo run -- ingester --apis blue_moon,sea_monster
+# Run minimal ingestion (fetch raw data only)
+cargo run --bin sms-scraper -- ingester --source-id neumos
 
-# Run ingester with database persistence
-cargo run -- ingester --apis blue_moon --use-database
+# Run full pipeline (ingestion + processing)
+cargo run --bin sms-scraper -- full-pipeline --source-id neumos
 
+# Clear venue data for development/testing
+cargo run --bin sms-scraper -- clear-db --venue-slug neumos
+
+# Run GraphQL server
+cargo run --bin sms-graphql
+
+# Run web interface
+cargo run --bin sms-web
 
 # Test database connection
 cargo run --bin test_db
 
 # Run integration tests
 cargo run --bin test_integration
-
-# Run GraphQL server
-cargo run -- server --port 8080
-
-# Run full scraper with metrics
-cargo run -- scraper
 ```
 
 ### 📊 Metrics & Observability
@@ -119,20 +125,20 @@ docker-compose run --rm scraper-job
 ```
 
 Metrics cover all pipeline phases:
-- **Sources**: Request success/failure, durations, payload sizes
-- **Gateway**: Envelope processing, deduplication rates, CAS operations  
-- **Parser**: Parsing performance, record production, error rates
-- **Ingest Log**: Write operations, consumer lag, file rotations
+- **Ingestion**: Raw data fetching, HTTP request metrics
+- **Processing**: Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
+- **Storage**: Database operations, connection health
+- **Pipeline**: End-to-end processing times and success rates
 
 See [METRICS.md](METRICS.md) for complete documentation.
 
 ## Configuration
 
-Configuration is managed via `config.toml` with support for:
-- API endpoints and credentials
-- Rate limiting settings
-- Logging levels
-- Storage configuration
+Configuration is managed via multiple files:
+- **`registry/sources/*.json`**: Individual venue/API configurations
+- **`.env`**: Database credentials and environment variables
+- **`config.toml`**: Rate limiting and processing settings
+- **Environment variables**: `LIBSQL_URL`, `LIBSQL_AUTH_TOKEN`, `RUST_LOG`
 
 ## 🏆 Architecture Score: 5.0/5
 
@@ -147,11 +153,12 @@ Configuration is managed via `config.toml` with support for:
 
 **Future Enhancements:**
 - ✅ ~~Persistent storage backend~~ → **Turso/libSQL implemented**
+- ✅ ~~GraphQL API layer~~ → **Implemented with health checks**
+- ✅ ~~Web dashboard~~ → **HTML interface with event/venue/artist browsing**
 - Enhanced concurrent processing in processing stage
 - External API integrations (Ticketmaster, Eventbrite, etc.)
 - Advanced artist parsing with NLP
-- GraphQL API layer for data access
-- Web dashboard for monitoring and management
+- Production deployment automation
 
 ## Archive
 

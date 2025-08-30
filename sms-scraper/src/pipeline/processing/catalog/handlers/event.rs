@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use tracing::{debug, error};
 use uuid::Uuid;
 
-use crate::common::error::Result;
-use crate::domain::{Event, ProcessRecord, ProcessRun};
+use sms_core::common::error::Result;
+use sms_core::domain::{Event, ProcessRecord, ProcessRun};
 use crate::pipeline::processing::catalog::candidate::{
     CatalogCandidate, ChangeSet, PersistedEntity, ProposedEntity
 };

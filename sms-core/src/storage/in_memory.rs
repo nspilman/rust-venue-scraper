@@ -79,6 +79,15 @@ impl Storage for InMemoryStorage {
         Ok(artist)
     }
 
+    async fn get_artist_by_slug(&self, slug: &str) -> Result<Option<Artist>> {
+        let artists = self.artists.lock().unwrap();
+        let artist = artists
+            .values()
+            .find(|a| a.name_slug == slug)
+            .cloned();
+        Ok(artist)
+    }
+
     async fn create_event(&self, event: &mut Event) -> Result<()> {
         let id = Uuid::new_v4();
         event.id = Some(id);

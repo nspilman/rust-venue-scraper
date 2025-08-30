@@ -15,6 +15,7 @@ pub trait Storage: Send + Sync {
     // Artist operations
     async fn create_artist(&self, artist: &mut Artist) -> Result<()>;
     async fn get_artist_by_name(&self, name: &str) -> Result<Option<Artist>>;
+    async fn get_artist_by_slug(&self, slug: &str) -> Result<Option<Artist>>;
     
     // Event operations
     async fn create_event(&self, event: &mut Event) -> Result<()>;

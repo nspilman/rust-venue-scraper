@@ -2,7 +2,7 @@ use chrono::Utc;
 use std::sync::{Arc, Mutex};
 use anyhow::Result;
 
-use crate::domain::{Artist, Event, Venue};
+use sms_core::domain::{Artist, Event, Venue};
 use crate::pipeline::processing::parser::ParsedRecord;
 use crate::observability::metrics;
 use super::super::{NormalizedRecord, NormalizedEntity, RecordProvenance, NormalizationMetadata};

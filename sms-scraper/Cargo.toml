@@ -4,8 +4,13 @@ version = "0.1.0"
 edition = "2021"
 description = "Full SMS scraper with all crawlers and processing pipeline"
 
+[features]
+default = ["scraping", "db"]
+scraping = []
+db = []
+
 [dependencies]
-sms-core = { path = "../sms-core", features = ["db"] }
+sms-core = { path = "../sms-core", features = ["db", "http"] }
 
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -15,7 +20,8 @@ uuid = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-appender = "0.2"
 async-trait = { workspace = true }
 
 # HTTP client for scraping
@@ -47,3 +53,7 @@ rusqlite = { package = "libsql-rusqlite", version = "0.31" }
 metrics = "0.23"
 metrics-exporter-prometheus = "0.13"
 once_cell = "1.19"
+
+
+[dev-dependencies]
+tempfile = { workspace = true }

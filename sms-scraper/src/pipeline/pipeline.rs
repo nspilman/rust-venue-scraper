@@ -1,7 +1,7 @@
-use crate::domain::RawData;
-use crate::common::error::Result;
+use sms_core::domain::RawData;
+use sms_core::common::error::Result;
 use crate::pipeline::storage::Storage;
-use crate::common::types::{EventApi, EventArgs, RawDataInfo};
+use sms_core::common::types::{EventApi, EventArgs, RawDataInfo};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -61,97 +61,80 @@ impl Pipeline {
         }))
     }
 
-    /// Run the complete pipeline for a given API with storage integration
+    /// Run minimal ingestion for a given API - only fetch and store raw bytes
     #[instrument(skip(api, storage), fields(api_name = %api.api_name()))]
-    pub async fn run_for_api_with_storage(
+    pub async fn run_ingestion_only(
         api: Box<dyn EventApi>,
         output_dir: &str,
         storage: Arc<dyn Storage>,
     ) -> Result<PipelineResult> {
         let api_name = api.api_name().to_string();
-        info!("🚀 Starting pipeline with storage for {}", api_name);
-        println!("🚀 Starting pipeline for {}", api_name);
+        info!("📥 Starting minimal ingestion for {}", api_name);
+        println!("📥 Starting minimal ingestion for {}", api_name);
         // metrics: count pipeline runs
         crate::observability::metrics::sources::registry_load_success();
         let t_pipeline = std::time::Instant::now();
 
-        // Step 1: Fetch raw events
-        info!("📡 Fetching events from {}...", api_name);
-        println!("📡 Fetching events from {}...", api_name);
+        // Step 1: Fetch raw events (raw JSON/HTML bytes only)
+        info!("📡 Fetching raw bytes from {}...", api_name);
+        println!("📡 Fetching raw bytes from {}...", api_name);
         let t_fetch = std::time::Instant::now();
         let raw_events = api.get_event_list().await?;
         let fetch_secs = t_fetch.elapsed().as_secs_f64();
         crate::observability::metrics::sources::request_duration(fetch_secs);
-        info!("✅ Fetched {} raw events", raw_events.len());
-        println!("✅ Fetched {} raw events", raw_events.len());
+        info!("✅ Fetched {} raw event records", raw_events.len());
+        println!("✅ Fetched {} raw event records", raw_events.len());
         // Record payload size through Sources metrics
         crate::observability::metrics::sources::request_success();
 
-        // Step 2: Process events
-        info!("🔧 Processing events...");
-        println!("🔧 Processing events...");
-        let mut processed_events = Vec::new();
+        // Step 2: Store raw bytes only (no processing)
+        info!("💾 Storing raw bytes to database...");
+        println!("💾 Storing raw bytes to database...");
+        let mut stored_count = 0;
         let mut errors = Vec::new();
-        let mut skipped = 0;
 
         for (i, raw_event) in raw_events.iter().enumerate() {
-            match Self::process_event(&*api, raw_event) {
-                Ok(Some(processed)) => {
-                    processed_events.push(processed);
+            // Store raw JSON bytes directly without any processing
+            let mut raw_data = RawData {
+                id: None,
+                api_name: sms_core::common::constants::api_name_to_internal(&api_name),
+                event_api_id: format!("{}-raw-{}", api_name, i), // Temporary ID for raw data
+                event_name: "Raw Event Data".to_string(), // Will be parsed later
+                venue_name: api_name.clone(), // Will be parsed later
+                event_day: chrono::Utc::now().date_naive(), // Will be parsed later
+                data: raw_event.clone(), // Store the raw JSON as-is
+                processed: false, // Mark as unprocessed for full pipeline
+                event_id: None,
+                created_at: chrono::Utc::now(),
+            };
+            
+            match storage.create_raw_data(&mut raw_data).await {
+                Ok(_) => {
+                    stored_count += 1;
                     if (i + 1) % 10 == 0 {
-                        debug!("Processed {}/{} events", i + 1, raw_events.len());
-                        println!("   Processed {}/{} events", i + 1, raw_events.len());
+                        debug!("Stored {}/{} raw records", i + 1, raw_events.len());
+                        println!("   Stored {}/{} raw records", i + 1, raw_events.len());
                     }
                 }
-                Ok(None) => {
-                    skipped += 1;
-                }
                 Err(e) => {
-                    let error_msg = format!("Failed to process event {i}: {e}");
-                    error!("Processing failed for event {}: {}", i, e);
+                    let error_msg = format!("Failed to store raw event {i}: {e}");
+                    error!("Storage failed for event {}: {}", i, e);
                     errors.push(error_msg);
                 }
             }
         }
 
-        info!(
-            "✅ Processed {} events ({} skipped, {} errors)",
-            processed_events.len(),
-            skipped,
-            errors.len()
-        );
-        println!(
-            "✅ Processed {} events ({} skipped, {} errors)",
-            processed_events.len(),
-            skipped,
-            errors.len()
-        );
-        // metrics: counts
-        crate::observability::metrics::parser::parse_success();
-        crate::observability::metrics::parser::records_extracted(processed_events.len() as u64);
-        if errors.len() > 0 {
-            crate::observability::metrics::parser::parse_error();
-        }
-
-        // Step 3: Save raw data to storage
-        info!("💾 Saving raw data to storage...");
-        for processed_event in &processed_events {
-            let mut raw_data = RawData::from_processed_event(processed_event);
-            // Map API names to the internal storage format
-            raw_data.api_name = crate::common::constants::api_name_to_internal(&raw_data.api_name);
-            if let Err(e) = storage.create_raw_data(&mut raw_data).await {
-                warn!("Failed to save raw data to storage: {}", e);
-            }
-        }
-
-        // Step 4: Persist to JSON (legacy)
-        let output_file = Self::persist_to_json(&processed_events, &api_name, output_dir)?;
-        info!("💾 Saved events to {}", output_file);
-        println!("💾 Saved events to {}", output_file);
+        info!("✅ Stored {} raw records ({} errors)", stored_count, errors.len());
+        println!("✅ Stored {} raw records ({} errors)", stored_count, errors.len());
+        
+        // Step 3: Persist to JSON (legacy) - store raw events
+        let output_file = Self::persist_raw_to_json(&raw_events, &api_name, output_dir)?;
+        info!("💾 Saved raw events to {}", output_file);
+        println!("💾 Saved raw events to {}", output_file);
 
         // metrics: total pipeline duration
         let total_secs = t_pipeline.elapsed().as_secs_f64();
-        crate::observability::metrics::parser::duration(total_secs);
+        crate::observability::metrics::sources::request_duration(total_secs);
 
         // Ensure snapshot is non-empty at push time
         crate::observability::heartbeat();
@@ -159,14 +142,35 @@ impl Pipeline {
         Ok(PipelineResult {
             api_name,
             total_events: raw_events.len(),
-            processed_events: processed_events.len(),
-            skipped_events: skipped,
+            processed_events: 0, // No processing done in ingestion
+            skipped_events: 0,
             errors,
             output_file,
         })
     }
 
-    /// Persist processed events to JSON file
+    /// Persist raw events to JSON file
+    fn persist_raw_to_json(
+        events: &[serde_json::Value],
+        api_name: &str,
+        output_dir: &str,
+    ) -> Result<String> {
+        // Ensure output directory exists
+        fs::create_dir_all(output_dir)?;
+
+        // Generate filename with timestamp
+        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("{api_name}_raw_{timestamp}.json");
+        let filepath = Path::new(output_dir).join(&filename);
+
+        // Serialize and write raw events
+        let json_content = serde_json::to_string_pretty(events)?;
+        fs::write(&filepath, json_content)?;
+
+        Ok(filepath.to_string_lossy().to_string())
+    }
+
+    /// Persist processed events to JSON file (legacy method)
     fn persist_to_json(
         events: &[ProcessedEvent],
         api_name: &str,

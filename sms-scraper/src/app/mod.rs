@@ -3,9 +3,10 @@ pub mod parse_use_case;
 pub mod ingest_use_case;
 pub mod normalize_use_case;
 
-// These modules are complete implementations but currently only used in tests
-#[cfg(test)]
+// These modules are complete implementations
 pub mod quality_gate_use_case;
+
+// These modules are currently only used in tests
 #[cfg(test)]
 pub mod enrich_use_case;
 #[cfg(test)]

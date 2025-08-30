@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{Artist, Event, Venue};
+use sms_core::domain::{Artist, Event, Venue};
 
 pub mod normalizers;
 pub mod registry;

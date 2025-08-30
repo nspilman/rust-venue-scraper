@@ -1,0 +1,33 @@
+{
+  "source_id": "sunset_tavern",
+  "identity": { 
+    "name": "Sunset Tavern Events Calendar", 
+    "owner_team": "ingestion", 
+    "contact_email": "dataops@example.com" 
+  },
+  "enabled": true,
+  "endpoints": [ 
+    { 
+      "url": "https://partners-endpoint.dice.fm/api/v2/events?page%5Bsize%5D=&types=linkout%2Cevent&filter%5Bpromoters%5D%5B%5D=Bars+We+Like%2C+Inc+dba+Sunset+Tavern", 
+      "method": "GET" 
+    } 
+  ],
+  "auth": { "method": "cookie" },
+  "rate_limits": { 
+    "requests_per_min": 6, 
+    "bytes_per_min": 20000000, 
+    "concurrency": 1 
+  },
+  "content": { 
+    "allowed_mime_types": ["application/json", "text/html"],
+    "max_payload_size_bytes": 20000000 
+  },
+  "policy": { 
+    "license_id": "terms-unknown", 
+    "robots_tos_posture": "respect", 
+    "pii_risk_class": "low", 
+    "pii_action": "allow" 
+  },
+  "change_detection": { "strategy": "snapshot" },
+  "parse_plan_ref": "parse_plan:dice_api_v1"
+}

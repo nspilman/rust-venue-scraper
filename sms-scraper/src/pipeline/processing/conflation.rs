@@ -601,7 +601,7 @@ impl Conflator for DefaultConflator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Event, Venue, Artist};
+    use sms_core::domain::{Event, Venue, Artist};
     use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
     use crate::pipeline::processing::quality_gate::{QualityAssessment, QualityDecision};
     use crate::pipeline::processing::enrich::{EnrichmentMetadata, GeoProperties, PopulationDensity, ReferenceVersions};

@@ -123,7 +123,7 @@ impl ToString for crate::pipeline::processing::conflation::EntityType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Venue;
+    use sms_core::domain::Venue;
     use crate::pipeline::processing::conflation::{ConflatedRecord, ConflationMetadata, EntityId, EntityType, ResolutionDecision, DeduplicationMetadata};
     use crate::pipeline::processing::enrich::{EnrichedRecord, EnrichmentMetadata, GeoProperties, PopulationDensity, ReferenceVersions};
     use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};

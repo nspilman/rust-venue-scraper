@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
-use crate::common::error::Result;
-use crate::domain::{ProcessRecord, ProcessRun};
+use sms_core::common::error::Result;
+use sms_core::domain::{ProcessRecord, ProcessRun};
 use crate::pipeline::processing::conflation::ConflatedRecord;
 use crate::pipeline::storage::Storage;
 

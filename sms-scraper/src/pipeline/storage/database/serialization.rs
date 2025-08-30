@@ -1,4 +1,4 @@
-use crate::domain::*;
+use sms_core::domain::*;
 use crate::error::{Result, ScraperError};
 use uuid::Uuid;
 

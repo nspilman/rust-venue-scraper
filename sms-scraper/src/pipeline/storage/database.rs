@@ -1,29 +1,18 @@
-#[cfg(feature = "db")]
 use super::traits::Storage;
-#[cfg(feature = "db")]
-use crate::common::error::{Result, ScraperError};
-#[cfg(feature = "db")]
-use crate::db::DatabaseManager;
-#[cfg(feature = "db")]
-use crate::domain::*;
-#[cfg(feature = "db")]
+use sms_core::common::error::{Result, ScraperError};
+use sms_core::database::DatabaseManager;
+use sms_core::domain::*;
 use async_trait::async_trait;
-#[cfg(feature = "db")]
 use chrono::NaiveDate;
-#[cfg(feature = "db")]
 use std::sync::Arc;
-#[cfg(feature = "db")]
 use tracing::{debug, info};
-#[cfg(feature = "db")]
 use uuid::Uuid;
 
 /// Database storage implementation using Turso/libSQL with nodes and edges schema
-#[cfg(feature = "db")]
 pub struct DatabaseStorage {
     db: Arc<DatabaseManager>,
 }
 
-#[cfg(feature = "db")]
 impl DatabaseStorage {
     pub async fn new() -> Result<Self> {
         let db_manager = DatabaseManager::new().await?;
@@ -135,7 +124,6 @@ impl DatabaseStorage {
     }
 }
 
-#[cfg(feature = "db")]
 #[async_trait]
 impl Storage for DatabaseStorage {
     async fn create_venue(&self, venue: &mut Venue) -> Result<()> {
@@ -812,5 +800,61 @@ impl Storage for DatabaseStorage {
         }
         
         Ok(artists)
+    }
+
+    async fn mark_raw_data_unprocessed(&self, raw_data_id: Uuid) -> Result<()> {
+        // Get the current raw data
+        if let Some((id, _label, data)) = self
+            .db
+            .get_node(&raw_data_id.to_string())
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to get raw data node: {e}"),
+            })?
+        {
+            let mut raw_data = Self::node_data_to_raw_data(&id, &data)?;
+            raw_data.processed = false; // Mark as unprocessed
+
+            let updated_data = Self::raw_data_to_node_data(&raw_data)?;
+            
+            // Update the node with new processed flag
+            self.db
+                .create_node(&raw_data_id.to_string(), "raw_data", &updated_data)
+                .await
+                .map_err(|e| ScraperError::Database {
+                    message: format!("Failed to update raw data node: {e}"),
+                })?;
+
+            debug!("Marked raw data {} as unprocessed", raw_data_id);
+        }
+        
+        Ok(())
+    }
+
+    async fn get_all_raw_data_for_source(&self, api_name: &str) -> Result<Vec<RawData>> {
+        // Get all raw_data nodes for this API name
+        let all_raw_data = self.db
+            .get_nodes_by_label("raw_data")
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to get raw data nodes: {e}"),
+            })?;
+
+        let mut result = Vec::new();
+        
+        for (id, _label, data) in all_raw_data {
+            let raw_data = Self::node_data_to_raw_data(&id, &data)?;
+            
+            // Filter by API name
+            if raw_data.api_name == api_name {
+                result.push(raw_data);
+            }
+        }
+
+        // Sort by created_at descending (newest first)
+        result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        debug!("Retrieved {} raw data items for source: {}", result.len(), api_name);
+        Ok(result)
     }
 }

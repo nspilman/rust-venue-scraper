@@ -37,6 +37,8 @@ use crate::apis::kexp::KexpCrawler;
 use crate::apis::neumos::NeumosCrawler;
 #[cfg(feature = "scraping")]
 use crate::apis::sea_monster::SeaMonsterCrawler;
+#[cfg(feature = "scraping")]
+use crate::apis::sunset_tavern::SunsetTavernCrawler;
 #[cfg(feature = "db")]
 use crate::db::DatabaseManager;
 use crate::pipeline::pipeline::Pipeline;
@@ -84,12 +86,9 @@ enum IngestLogCmd {
 enum Commands {
     /// Run the complete pipeline: Gateway → Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
     FullPipeline {
-        /// Source ID to process (e.g., blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos)
+        /// Source ID to process (e.g., blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos, conor_byrne, sunset_tavern)
         #[arg(long)]
         source_id: String,
-        /// Use database storage instead of in-memory
-        #[arg(long)]
-        use_database: bool,
         /// Bypass cadence (fetch even if fetched within the last interval)
         #[arg(long)]
         bypass_cadence: bool,
@@ -120,12 +119,9 @@ enum Commands {
     },
     /// Run the data ingestion process
     Ingester {
-        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos
+        /// Specific APIs to run (comma-separated). Available: blue_moon, sea_monster, darrells_tavern, kexp, barboza, neumos, conor_byrne, sunset_tavern
         #[arg(long)]
         apis: Option<String>,
-        /// Use database storage instead of in-memory (requires LIBSQL_URL and LIBSQL_AUTH_TOKEN env vars)
-        #[arg(long)]
-        use_database: bool,
         /// Bypass cadence (fetch even if fetched within the last interval)
         #[arg(long)]
         bypass_cadence: bool,
@@ -138,9 +134,6 @@ enum Commands {
         /// Metrics bind address (host:port). Default 127.0.0.1:9464
         #[arg(long)]
         metrics_addr: Option<String>,
-        /// Use database storage instead of in-memory (requires LIBSQL_URL and LIBSQL_AUTH_TOKEN env vars)
-        #[arg(long)]
-        use_database: bool,
     },
     /// One-off: fetch bytes for a source per registry, build envelope, persist CAS + envelope locally
     #[command(alias = "GatewayOnce")]
@@ -198,31 +191,24 @@ fn create_api(api_name: &str) -> Option<Box<dyn EventApi>> {
         constants::BARBOZA_API => Some(Box::new(BarbozaCrawler::new())),
         constants::NEUMOS_API => Some(Box::new(NeumosCrawler::new())),
         constants::CONOR_BYRNE_API => Some(Box::new(ConorByrneCrawler::new())),
+        constants::SUNSET_TAVERN_API => Some(Box::new(SunsetTavernCrawler::new())),
         _ => None,
     }
 }
 
-async fn create_storage(
-    use_database: bool,
-) -> Result<Arc<dyn Storage>, Box<dyn std::error::Error>> {
-    if use_database {
-        #[cfg(feature = "db")]
-        {
-            dotenv::dotenv().ok(); // Load environment variables
-            info!("Creating database storage connection...");
-            let db_storage = DatabaseStorage::new().await
-                .map_err(|e| format!("Failed to initialize database storage: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
-            info!("✅ Database storage initialized successfully");
-            return Ok(Arc::new(db_storage));
-        }
-        #[cfg(not(feature = "db"))]
-        {
-            warn!("Database feature not enabled at build time; falling back to in-memory storage");
-            return Ok(Arc::new(InMemoryStorage::new()));
-        }
-    } else {
-        info!("Using in-memory storage (data will not persist)");
-        Ok(Arc::new(InMemoryStorage::new()))
+async fn create_storage() -> Result<Arc<dyn Storage>, Box<dyn std::error::Error>> {
+    #[cfg(feature = "db")]
+    {
+        dotenv::dotenv().ok(); // Load environment variables
+        info!("Initializing database storage...");
+        let db_storage = DatabaseStorage::new().await
+            .map_err(|e| format!("Failed to initialize database storage: {e}. Make sure LIBSQL_URL and LIBSQL_AUTH_TOKEN environment variables are set."))?;
+        info!("Database storage initialized successfully");
+        return Ok(Arc::new(db_storage));
+    }
+    #[cfg(not(feature = "db"))]
+    {
+        return Err("Database feature not enabled at build time. Please rebuild with --features=db".into());
     }
 }
 
@@ -303,7 +289,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::FullPipeline {
             source_id,
-            use_database,
             bypass_cadence,
         } => {
             use crate::pipeline::processing::{
@@ -335,7 +320,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if bypass_cadence {
                 std::env::set_var("SMS_BYPASS_CADENCE", "1");
             }
-            let storage = create_storage(use_database).await?;
+            let storage = create_storage().await?;
             let data_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data");
             
             // STEP 1: GATEWAY
@@ -569,16 +554,11 @@ use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
             println!("  📚 Catalog: {} venues, {} events, {} artists stored",
                      catalogged_venues, catalogged_events, catalogged_artists);
             
-            if use_database {
-                println!("\n💾 Data persisted to database");
-            } else {
-                println!("\n🧠 Data stored in memory (will not persist)");
-            }
+            println!("\n💾 Data persisted to database");
             println!("{}", "=".repeat(60));
         }
         Commands::Ingester {
             apis,
-            use_database,
             bypass_cadence,
         } => {
             println!("🔄 Running ingester pipeline...");
@@ -602,7 +582,7 @@ use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
                     .collect()
             };
 
-            let storage = create_storage(use_database).await?;
+            let storage = create_storage().await?;
             run_apis(&api_names, output_dir, storage).await?;
             
             // Push all collected metrics to Pushgateway before exit
@@ -613,7 +593,7 @@ use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
                 info!("Successfully pushed metrics to Pushgateway");
             }
         }
-        Commands::Server { port, metrics_addr, use_database } => {
+        Commands::Server { port, metrics_addr } => {
             println!("🚀 Starting GraphQL API server on port {port}...");
 
             // Initialize metrics with server address
@@ -624,7 +604,7 @@ use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
                 eprintln!("Warning: Failed to initialize metrics: {}", e);
             });
 
-            let storage = create_storage(use_database).await?;
+            let storage = create_storage().await?;
 
             println!("📡 Server endpoints:");
             println!("   GraphQL API: http://localhost:{port}/graphql");
@@ -635,11 +615,7 @@ use crate::infra::conflation_output_adapter::ConflationOutputAdapter;
             println!("   Health check: http://localhost:{port}/health");
             println!();
 
-            if use_database {
-                println!("💾 Using database storage");
-            } else {
-                println!("🧠 Using in-memory storage (data will not persist)");
-            }
+            println!("💾 Using database storage");
             println!();
 
             match server::start_server(storage, port).await {
@@ -850,7 +826,7 @@ let _metrics = std::sync::Arc::new(MetricsForwarder);
                 normalize: Some(normalize),
                 quality_gate: Some(quality_gate),
             };
-            let storage = std::sync::Arc::new(InMemoryStorage::new()) as std::sync::Arc<dyn Storage>;
+            let storage = create_storage().await?;
             match crate::pipeline::tasks::parse_run(storage, params).await {
                 Ok(summary) => {
                     println!("parse_done -> {}", summary.output_file);

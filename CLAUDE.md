@@ -11,19 +11,19 @@ This is a Rust-based event data scraper for the Seattle Music Scene (SMS) projec
 ### Core Components
 - **Pipeline**: Orchestrates the data flow from raw ingestion to processed output
 - **EventApi Trait**: Common interface for all data sources (APIs and web crawlers)
-- **Storage**: Abstraction layer for data persistence (currently in-memory, will connect to PostgreSQL)
-- Processing: Data processing and cleaning component
-- **Types**: Core data structures and models
+- **Storage**: Abstraction layer for data persistence (dual-mode: in-memory + Turso/libSQL)
+- **Processing**: Complete ETL pipeline: Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
+- **Domain**: Core data structures and models (Venue, Artist, Event, RawData)
 
 ### Implemented Data Sources
 **Web Crawlers:**
+- Neumos (Seattle venue - primary implementation)
+- Barboza (Capitol Hill venue)
 - Blue Moon Tavern (Wix calendar API)
+- Conor Byrne (Ballard pub with GraphQL parser)
+- KEXP Events (radio station event listings)
 - Sea Monster Lounge (venue-specific crawler)
 - Darrell's Tavern (venue-specific crawler)
-- Barboza (venue-specific crawler)
-- KEXP Events (event listing crawler)
-- Neumos (venue-specific crawler)
-- Conor Byrne (venue-specific scraper with GraphQL parser)
 
 **Source Registry:**
 - Configuration-driven approach using JSON source definitions in `registry/sources/`
@@ -44,24 +44,29 @@ This is a Rust-based event data scraper for the Seattle Music Scene (SMS) projec
 # Build the project
 cargo build
 
-# Run with different modes
-cargo run -- ingester --apis blue_moon,sea_monster,darrells_tavern,barboza,kexp,neumos,conor_byrne
-# Run ingester with database persistence
-cargo run -- ingester --apis blue_moon --use-database
+# Run minimal ingestion (fetch raw data only)
+cargo run --bin sms-scraper -- ingester --source-id neumos
 
-# Run GraphQL server (in-memory or database mode)
-cargo run -- server --port 8080
-cargo run -- server --port 8080 --use-database
+# Run full pipeline (ingestion + processing)
+cargo run --bin sms-scraper -- full-pipeline --source-id neumos
+
+# Clear venue data for development/testing
+cargo run --bin sms-scraper -- clear-db --venue-slug neumos
+
+# Run GraphQL server
+cargo run --bin sms-graphql
+
+# Run web interface
+cargo run --bin sms-web
 
 # Check for errors and warnings
 cargo check
 cargo clippy
 
 # Makefile shortcuts
-make ingest              # Run ingester for all crawlers (in-memory)
-make ingest-db          # Run ingester with database
-make run-graphql        # Run GraphQL server (in-memory)
-make run-graphql-db     # Run GraphQL server (database)
+make ingest              # Run ingester for all crawlers
+make run-graphql        # Run GraphQL server
+make run-web            # Run web interface
 make start              # Start both GraphQL and web servers
 make test               # Run tests
 make clippy             # Run lints with warnings as errors
@@ -117,8 +122,8 @@ cargo clippy -- -D warnings
 ## Current Status
 
 ### ✅ Completed
-- **Architecture:** EventApi trait, clean architecture, ETL pipeline
-- **Data Sources:** 7 working crawlers (Blue Moon, Sea Monster, Darrell's, Barboza, KEXP, Neumos, Conor Byrne)
+- **Architecture:** EventApi trait, clean architecture, ETL pipeline following Platonic Ideal
+- **Data Sources:** 7 working crawlers (Neumos, Barboza, Blue Moon, Conor Byrne, KEXP, Sea Monster, Darrell's)
 - **Database:** Full Turso/libSQL integration with graph schema and migrations  
 - **Storage:** Dual-mode (in-memory + database) with abstractions
 - **Pipeline:** Complete ingestion → parsing → normalization → conflation → enrichment
@@ -128,18 +133,20 @@ cargo clippy -- -D warnings
 - **DevOps:** Docker containerization, docker-compose stack with monitoring
 - **Testing:** Integration tests, schema validation, envelope testing
 - **Tooling:** Multiple utility binaries, Makefile shortcuts, development scripts
+- **Data Management:** Venue data deletion command for development/testing
 
 ### 🚧 In Progress  
 - Advanced artist parsing and relationship detection
 - Quality gates and data validation enhancements
 - Performance optimizations for large datasets
+- Production deployment automation
 
 ### 📋 Planned
 - External API integrations (Ticketmaster, Eventbrite, etc.)
 - Remaining venue crawlers (Little Red Hen, Skylark, Royal Room)
 - Open mic event generation logic
 - Enhanced deduplication and conflation algorithms
-- Production deployment automation
+- Advanced NLP for artist name parsing and matching
 
 ## File Structure
 ```
@@ -264,10 +271,11 @@ LOG_DIRECTORY=logs
 
 ### Binary Programs
 The project includes multiple utility binaries:
-- `sms_scraper`: Main CLI (ingester, server modes)
+- `sms-scraper`: Main CLI with ingester, full-pipeline, and clear-db commands
+- `sms-graphql`: GraphQL API server
+- `sms-web`: Web interface server
 - `build-dashboard`: Grafana dashboard generator
 - `validate-envelope`: JSON schema validation
-- `clear-database`: Database cleanup utility
 - `diagnose-artist-links`: Debugging tool for artist relationships
 
 ## Migration Notes

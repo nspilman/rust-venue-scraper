@@ -1,4 +1,4 @@
-use crate::common::constants;
+use sms_core::common::constants;
 use crate::pipeline::ingestion::envelope::{
     ChecksumMeta, EnvelopeSubmissionV1, LegalMeta, PayloadMeta, RequestMeta, TimingMeta,
 };

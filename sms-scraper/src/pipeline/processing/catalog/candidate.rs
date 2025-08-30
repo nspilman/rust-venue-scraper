@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{Artist, Event, Venue};
+use sms_core::domain::{Artist, Event, Venue};
 use crate::pipeline::processing::conflation::{EntityId, EntityType};
 
 /// Represents an entity that is a candidate for cataloging

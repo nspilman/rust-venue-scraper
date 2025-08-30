@@ -642,6 +642,9 @@ pub struct NeumosHtmlV1Parser {
     pub payload_ref: String,
 }
 
+pub mod venuepilot_graphql;
+pub use venuepilot_graphql::VenuePilotGraphQLV1Parser;
+
 impl NeumosHtmlV1Parser {
     pub fn new(source_id: String, envelope_id: String, payload_ref: String) -> Self {
         Self {

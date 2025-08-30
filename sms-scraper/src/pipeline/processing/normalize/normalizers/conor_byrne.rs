@@ -3,7 +3,7 @@ use uuid::Uuid;
 use anyhow::Result;
 
 use super::base::{SourceNormalizer, NormalizerUtils, VenueStateManager, ArtistStateManager};
-use crate::domain::{Artist, Event, Venue};
+use sms_core::domain::{Artist, Event, Venue};
 use crate::pipeline::processing::parser::ParsedRecord;
 use crate::pipeline::processing::normalize::NormalizedRecord;
 

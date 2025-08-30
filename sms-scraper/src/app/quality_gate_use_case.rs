@@ -198,7 +198,7 @@ mod tests {
         let use_case = QualityGateUseCase::with_default_quality_gate(accepted_output, quarantined_output);
 
         // Create a test normalized record (using a helper from quality_gate tests)
-        use crate::domain::Event;
+        use sms_core::domain::Event;
         use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
         use chrono::{NaiveDate, Utc};
         use uuid::Uuid;

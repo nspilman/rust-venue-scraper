@@ -212,6 +212,23 @@ impl Storage for DatabaseStorage {
         Ok(None)
     }
 
+    async fn get_artist_by_slug(&self, slug: &str) -> Result<Option<Artist>> {
+        let artists_data = self
+            .db
+            .get_nodes_by_label("artist")
+            .await
+            .map_err(|e| ScraperError::Database {
+                message: format!("Failed to query artists: {e}"),
+            })?;
+        for (id, _label, data) in artists_data.into_iter() {
+            let artist = Self::node_data_to_artist(&id, &data)?;
+            if artist.name_slug == slug {
+                return Ok(Some(artist));
+            }
+        }
+        Ok(None)
+    }
+
     async fn create_event(&self, event: &mut Event) -> Result<()> {
         debug!("[DATABASE] create_event called for: {}", event.title);
         

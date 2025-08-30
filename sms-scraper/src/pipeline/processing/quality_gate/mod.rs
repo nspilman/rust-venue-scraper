@@ -100,7 +100,6 @@ pub struct MetricsQualityGate<Q: QualityGate> {
 }
 
 impl<Q: QualityGate> MetricsQualityGate<Q> {
-    #[cfg(test)]
     pub fn new(inner: Q) -> Self {
         Self { inner }
     }
@@ -212,7 +211,7 @@ impl DefaultQualityGate {
     }
 
     /// Assess event-specific quality
-    fn assess_event_quality(&self, event: &crate::domain::Event) -> Vec<QualityIssue> {
+    fn assess_event_quality(&self, event: &sms_core::domain::Event) -> Vec<QualityIssue> {
         let mut issues = Vec::new();
 
         // Check if title is meaningful
@@ -265,7 +264,7 @@ impl DefaultQualityGate {
     }
 
     /// Assess venue-specific quality
-    fn assess_venue_quality(&self, venue: &crate::domain::Venue) -> Vec<QualityIssue> {
+    fn assess_venue_quality(&self, venue: &sms_core::domain::Venue) -> Vec<QualityIssue> {
         let mut issues = Vec::new();
 
         // Check venue name
@@ -319,7 +318,7 @@ impl DefaultQualityGate {
     }
 
     /// Assess artist-specific quality
-    fn assess_artist_quality(&self, artist: &crate::domain::Artist) -> Vec<QualityIssue> {
+    fn assess_artist_quality(&self, artist: &sms_core::domain::Artist) -> Vec<QualityIssue> {
         let mut issues = Vec::new();
 
         // Check artist name
@@ -443,7 +442,7 @@ impl Default for DefaultQualityGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Artist, Event, Venue};
+    use sms_core::domain::{Artist, Event, Venue};
     use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
     use chrono::{NaiveDate, Utc};
     use serde_json::json;

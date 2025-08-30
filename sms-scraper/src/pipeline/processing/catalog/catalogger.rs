@@ -3,8 +3,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 use tracing::{debug, info, warn};
 
-use crate::common::error::Result;
-use crate::domain::ProcessRun;
+use sms_core::common::error::Result;
+use sms_core::domain::ProcessRun;
 use crate::pipeline::processing::conflation::ConflatedRecord;
 use crate::pipeline::storage::Storage;
 

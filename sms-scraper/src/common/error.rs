@@ -25,4 +25,10 @@ pub enum ScraperError {
     Database { message: String },
 }
 
+impl From<sms_core::common::error::ScraperError> for ScraperError {
+    fn from(err: sms_core::common::error::ScraperError) -> Self {
+        ScraperError::Database { message: err.to_string() }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, ScraperError>;

@@ -245,7 +245,7 @@ mod tests {
     // Tests commented out temporarily due to struct field changes
     use super::*;
     use crate::app::ports::ConflationOutputPort;
-    use crate::domain::{Venue};
+    use sms_core::domain::{Venue};
     use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
     use crate::pipeline::processing::quality_gate::{QualityAssessment, QualityDecision, QualityAssessedRecord};
     use crate::pipeline::processing::enrich::{EnrichedRecord, EnrichmentMetadata, GeoProperties, PopulationDensity, ReferenceVersions};

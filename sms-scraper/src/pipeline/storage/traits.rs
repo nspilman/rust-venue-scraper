@@ -1,5 +1,5 @@
-use crate::domain::*;
-use crate::common::error::Result;
+use sms_core::domain::*;
+use sms_core::common::error::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use uuid::Uuid;
@@ -34,6 +34,8 @@ pub trait Storage: Send + Sync {
         min_date: Option<NaiveDate>
     ) -> Result<Vec<RawData>>;
     async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()>;
+    async fn mark_raw_data_unprocessed(&self, raw_data_id: Uuid) -> Result<()>;
+    async fn get_all_raw_data_for_source(&self, api_name: &str) -> Result<Vec<RawData>>;
     
     // Processing operations
     async fn create_process_run(&self, run: &mut ProcessRun) -> Result<()>;

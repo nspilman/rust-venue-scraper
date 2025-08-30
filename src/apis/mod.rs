@@ -11,3 +11,5 @@ pub mod kexp;
 pub mod neumos;
 #[cfg(feature = "scraping")]
 pub mod sea_monster;
+#[cfg(feature = "scraping")]
+pub mod sunset_tavern;

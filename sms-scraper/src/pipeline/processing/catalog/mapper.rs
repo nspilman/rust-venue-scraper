@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::common::error::{Result, ScraperError};
-use crate::domain::{Artist, Event, Venue};
+use sms_core::common::error::{Result, ScraperError};
+use sms_core::domain::{Artist, Event, Venue};
 use crate::pipeline::processing::conflation::ConflatedRecord;
 use crate::pipeline::processing::normalize::NormalizedEntity;
 

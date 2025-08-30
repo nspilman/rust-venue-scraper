@@ -8,7 +8,7 @@
   "enabled": true,
   "endpoints": [ 
     { 
-      "url": "https://www.neumos.com/events", 
+      "url": "https://www.neumos.com/events/events_ajax/12?venue=1&team=2&per_page=100&came_from_page=event-list-page", 
       "method": "GET" 
     } 
   ],

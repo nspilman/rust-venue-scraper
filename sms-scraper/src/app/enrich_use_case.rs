@@ -185,7 +185,7 @@ mod tests {
         let use_case = EnrichUseCase::with_default_enricher(output);
 
         // Create a test quality-assessed record
-        use crate::domain::Venue;
+        use sms_core::domain::Venue;
         use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
         use crate::pipeline::processing::quality_gate::{QualityAssessedRecord, QualityAssessment, QualityDecision};
         use chrono::Utc;

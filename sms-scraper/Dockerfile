@@ -5,7 +5,7 @@ FROM rust:1.83-alpine AS builder
 WORKDIR /app
 
 # System deps for musl builds
-RUN apk add --no-cache musl-dev pkgconfig build-base curl ca-certificates openssl-dev
+RUN apk add --no-cache musl-dev pkgconfig build-base curl ca-certificates openssl-dev openssl-libs-static
 
 # Copy workspace files
 COPY Cargo.toml Cargo.lock ./
@@ -37,4 +37,14 @@ EXPOSE 9898
 USER app
 ENV SMS_METRICS_PORT=9898
 
-CMD ["/usr/local/bin/sms-scraper", "ingester", "--apis", "blue_moon", "--bypass-cadence"]
+# Run ingestion for all sources, then run full pipeline for each source
+CMD ["/bin/sh", "-c", " \
+    /usr/local/bin/sms-scraper ingester --apis blue_moon,sea_monster,darrells_tavern,barboza,kexp,neumos,conor_byrne --bypass-cadence; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id blue_moon; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id sea_monster; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id darrells_tavern; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id barboza; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id kexp; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id neumos; \
+    /usr/local/bin/sms-scraper full-pipeline --source-id conor_byrne \
+"]

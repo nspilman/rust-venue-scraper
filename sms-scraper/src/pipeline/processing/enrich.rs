@@ -422,7 +422,7 @@ impl Enricher for DefaultEnricher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Event, Venue};
+    use sms_core::domain::{Event, Venue};
     use crate::pipeline::processing::normalize::{NormalizedEntity, NormalizedRecord, NormalizationMetadata, RecordProvenance};
     use crate::pipeline::processing::quality_gate::{QualityAssessment, QualityDecision};
     use chrono::{NaiveDate, Utc};
