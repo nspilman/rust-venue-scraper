@@ -85,7 +85,13 @@ pub async fn fetch_payload_and_log(source_id: &str) -> Result<Vec<u8>> {
     let client = reqwest::Client::new();
     rl.acquire(0).await; // acquire for RPM/concurrency before send
     let fetch_t0 = Instant::now();
-    let resp = client.get(&ep.url).send().await?;
+    
+    // Add browser-like User-Agent header for sites that require it (like Wix)
+    let resp = client
+        .get(&ep.url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+        .send()
+        .await?;
     let status = resp.status().as_u16();
     let headers = resp.headers().clone();
     let bytes = resp.bytes().await?;

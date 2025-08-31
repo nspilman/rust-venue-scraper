@@ -8,10 +8,19 @@ pub struct ReqwestHttp;
 impl HttpClientPort for ReqwestHttp {
     async fn get(&self, url: &str) -> Result<HttpGetResult, String> {
         let client = reqwest::Client::new();
-        let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+        tracing::info!("HTTP GET request to: {}", url);
+        let resp = client
+            .get(url)
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         let status = resp.status().as_u16();
         let headers = resp.headers().clone();
         let bytes = resp.bytes().await.map_err(|e| e.to_string())?.to_vec();
+        tracing::info!("HTTP response: status={}, size={} bytes, contains wix-warmup-data: {}", 
+            status, bytes.len(), 
+            String::from_utf8_lossy(&bytes).contains("wix-warmup-data"));
         let content_type = headers
             .get(CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())

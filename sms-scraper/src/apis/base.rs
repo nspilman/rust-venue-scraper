@@ -1,6 +1,8 @@
 use sms_core::common::error::{Result, ScraperError};
 use sms_core::common::types::{EventApi, EventArgs, RawDataInfo, RawEventData};
 use crate::pipeline::ingestion::ingest_common::fetch_payload_and_log;
+use crate::infra::http_client::ReqwestHttp;
+use crate::app::ports::HttpClientPort;
 use tracing::{info, instrument};
 
 /// Trait for venue-specific parsing logic
@@ -21,7 +23,7 @@ pub trait VenueParser: Send + Sync {
 
 /// Base crawler that implements EventApi using venue-specific parsers
 pub struct BaseCrawler {
-    client: reqwest::Client,
+    http_client: ReqwestHttp,
     api_name: &'static str,
     parser: Box<dyn VenueParser>,
 }
@@ -29,7 +31,7 @@ pub struct BaseCrawler {
 impl BaseCrawler {
     pub fn new(api_name: &'static str, parser: Box<dyn VenueParser>) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            http_client: ReqwestHttp,
             api_name,
             parser,
         }
@@ -44,8 +46,25 @@ impl EventApi for BaseCrawler {
 
     #[instrument(skip(self))]
     async fn get_event_list(&self) -> Result<Vec<RawEventData>> {
-        let payload = fetch_payload_and_log(self.api_name).await?;
-        let events = self.parser.parse_events(&payload).await?;
+        // Use our HTTP client with User-Agent header to fetch the payload
+        let url = match self.api_name {
+            "sea_monster" => "https://www.seamonsterlounge.com/buy-tickets-in-advance",
+            "kexp" => "https://www.kexp.org/events/kexp-events/",
+            "blue_moon" => "https://www.bluemoontavern.com/calendar/",
+            "darrells_tavern" => "https://www.darrellstavern.com/events/",
+            "barboza" => "https://www.barbozaseattle.com/events/",
+            "neumos" => "https://www.neumos.com/events/",
+            "conor_byrne" => "https://www.conorbyrnepub.com/events/",
+            _ => return Err(ScraperError::Api {
+                message: format!("Unknown API name: {}", self.api_name),
+            }),
+        };
+        
+        let http_result = self.http_client.get(url).await.map_err(|e| ScraperError::Api {
+            message: format!("HTTP request failed: {}", e),
+        })?;
+        
+        let events = self.parser.parse_events(&http_result.bytes).await?;
         
         info!(
             "Successfully fetched {} events from {}",

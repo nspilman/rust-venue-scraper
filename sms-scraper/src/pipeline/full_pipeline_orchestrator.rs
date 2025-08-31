@@ -25,14 +25,27 @@ impl FullPipelineOrchestrator {
     pub async fn process_source(&self, source_id: &str) -> Result<ProcessingResult> {
         info!("🔄 Starting full pipeline processing for source: {}", source_id);
 
+        // Check if bypass-cadence is set via environment variable to force fresh ingestion
+        let force_fresh_ingestion = std::env::var("BYPASS_CADENCE").is_ok() || 
+                                   std::env::var("FORCE_FRESH_INGESTION").is_ok();
+        
+        info!("🔍 Force fresh ingestion: {}", force_fresh_ingestion);
+        info!("🔍 BYPASS_CADENCE env var: {:?}", std::env::var("BYPASS_CADENCE"));
+        info!("🔍 FORCE_FRESH_INGESTION env var: {:?}", std::env::var("FORCE_FRESH_INGESTION"));
+
         // Get all unprocessed raw data for this source
         // Convert user-friendly source_id to internal API name for database lookup
         let internal_api_name = crate::common::constants::api_name_to_internal(source_id);
         let mut raw_data_items = self.storage.get_unprocessed_raw_data(&internal_api_name, None).await?;
+        let mut just_ingested_fresh_data = false;
         
-        if raw_data_items.is_empty() {
-            info!("ℹ️  No unprocessed raw data found for source: {}", source_id);
-            info!("🔄 Running ingestion to fetch fresh data...");
+        if raw_data_items.is_empty() || force_fresh_ingestion {
+            if force_fresh_ingestion {
+                info!("🔄 Force fresh ingestion enabled - running ingestion to fetch latest data...");
+            } else {
+                info!("ℹ️  No unprocessed raw data found for source: {}", source_id);
+                info!("🔄 Running ingestion to fetch fresh data...");
+            }
             
             // Run ingestion to fetch fresh data
             match self.run_ingestion_for_source(source_id).await {
@@ -40,6 +53,7 @@ impl FullPipelineOrchestrator {
                     info!("✅ Ingestion completed, checking for new raw data...");
                     // Get the newly ingested raw data
                     raw_data_items = self.storage.get_unprocessed_raw_data(&internal_api_name, None).await?;
+                    just_ingested_fresh_data = true;
                     
                     if raw_data_items.is_empty() {
                         info!("⚠️  No raw data found even after ingestion - source may be empty or have issues");
@@ -63,6 +77,15 @@ impl FullPipelineOrchestrator {
                     });
                 }
             }
+        }
+
+        // If we just ingested fresh data, only process the most recent item (the fresh HTML)
+        // to avoid processing old cached items without wix-warmup-data
+        if just_ingested_fresh_data && raw_data_items.len() > 1 {
+            info!("🔄 Just ingested fresh data - processing only the most recent item to avoid old cached data");
+            // Sort by created_at descending and take only the first (most recent) item
+            raw_data_items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            raw_data_items.truncate(1);
         }
 
         info!("📊 Found {} unprocessed raw data items for {}", raw_data_items.len(), source_id);
@@ -167,31 +190,49 @@ impl FullPipelineOrchestrator {
         let parser = super::super::apis::factory::create_parser(api_name)
             .ok_or_else(|| anyhow::anyhow!("Unknown parser: {}", api_name))?;
         
-        // Convert stored JSON value back to bytes for parsing
-        let json_string;
-        let bytes_slice = if let Some(bytes_str) = raw_data.data.as_str() {
-            bytes_str.as_bytes()
-        } else {
-            // If it's already structured JSON, serialize it back to bytes
-            json_string = serde_json::to_string(&raw_data.data)?;
-            json_string.as_bytes()
-        };
-        
-        // Parse raw bytes into structured events
-        let parsed_events = parser.parse_events(bytes_slice).await?;
-        
         let mut parsed_data_list = Vec::new();
         
-        // Convert each parsed event to ParsedEventData
-        for event_json in parsed_events {
-            let raw_data_info = parser.extract_raw_data_info(&event_json)?;
-            let event_args = parser.extract_event_args(&event_json)?;
+        // Check if the data is already structured (parsed during ingestion) or raw
+        if raw_data.data.is_object() || raw_data.data.is_array() {
+            // Data is already parsed - treat it as a single event or array of events
+            let events = if let Some(array) = raw_data.data.as_array() {
+                array.clone()
+            } else {
+                vec![raw_data.data.clone()]
+            };
             
-            parsed_data_list.push(ParsedEventData {
-                raw_data_info,
-                event_args,
-                source_api: raw_data.api_name.clone(),
-            });
+            for event_json in events {
+                let raw_data_info = parser.extract_raw_data_info(&event_json)?;
+                let event_args = parser.extract_event_args(&event_json)?;
+                
+                parsed_data_list.push(ParsedEventData {
+                    raw_data_info,
+                    event_args,
+                    source_api: raw_data.api_name.clone(),
+                });
+            }
+        } else {
+            // Data is raw (string/bytes) - needs parsing
+            let json_string;
+            let bytes_slice = if let Some(bytes_str) = raw_data.data.as_str() {
+                bytes_str.as_bytes()
+            } else {
+                json_string = serde_json::to_string(&raw_data.data)?;
+                json_string.as_bytes()
+            };
+            
+            let parsed_events = parser.parse_events(bytes_slice).await?;
+            
+            for event_json in parsed_events {
+                let raw_data_info = parser.extract_raw_data_info(&event_json)?;
+                let event_args = parser.extract_event_args(&event_json)?;
+                
+                parsed_data_list.push(ParsedEventData {
+                    raw_data_info,
+                    event_args,
+                    source_api: raw_data.api_name.clone(),
+                });
+            }
         }
         
         Ok(parsed_data_list)
