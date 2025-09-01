@@ -1,4 +1,4 @@
-use crate::pipeline::parser::ParsedRecord;
+use crate::pipeline::processing::pipeline_steps::ParsedRecord;
 use anyhow::Result;
 use chrono::{NaiveDate, Utc};
 use parquet::basic::{Compression, LogicalType, Type as PhysicalType};

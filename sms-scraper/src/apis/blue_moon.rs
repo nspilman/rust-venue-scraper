@@ -46,6 +46,18 @@ impl EventApi for BlueMoonCrawler {
                 for event in event_array {
                     let mut event_clone = event.clone();
                     event_clone["event_day"] = day.clone().into();
+                    
+                    // Generate unique ID for each event (required by parser)
+                    let title = event_clone["title"].as_str().unwrap_or("unknown");
+                    let start_time = event_clone["start_time"].as_str().unwrap_or("00:00:00");
+                    let event_id = format!("{}_{}_{}_{}", 
+                        title.replace(" ", "_").replace("'", "").to_lowercase(),
+                        day.replace("-", ""),
+                        start_time.replace(":", ""),
+                        "blue_moon"
+                    );
+                    event_clone["id"] = event_id.into();
+                    
                     all_events.push(event_clone);
                 }
             }

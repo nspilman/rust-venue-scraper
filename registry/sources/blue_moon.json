@@ -13,6 +13,12 @@
   "content": { "allowed_mime_types": ["application/json"], "max_payload_size_bytes": 20000000 },
   "policy": { "license_id": "terms-unknown", "robots_tos_posture": "respect", "pii_risk_class": "low", "pii_action": "allow" },
   "change_detection": { "strategy": "etag" },
-  "parse_plan_ref": "parse_plan:wix_calendar_v1"
+  "parse_plan_ref": "parse_plan:wix_calendar_v1",
+  "pipeline": {
+    "parser_id": "wix_calendar_v1", 
+    "normalizer_id": "blue_moon",
+    "content_type": "application/json",
+    "parser_type": "wix_calendar"
+  }
 }
 

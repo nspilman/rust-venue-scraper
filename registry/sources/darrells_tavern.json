@@ -8,6 +8,12 @@
   "content": { "allowed_mime_types": ["text/html"], "max_payload_size_bytes": 20000000 },
   "policy": { "license_id": "terms-unknown", "robots_tos_posture": "respect", "pii_risk_class": "low", "pii_action": "allow" },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:darrells_html_v1"
+  "parse_plan_ref": "parse_plan:darrells_html_v1",
+  "pipeline": {
+    "parser_id": "darrells_html_v1",
+    "normalizer_id": "darrells_tavern",
+    "content_type": "text/html",
+    "parser_type": "html_scraper"
+  }
 }
 

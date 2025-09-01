@@ -7,6 +7,7 @@ pub mod common;
 pub mod infra;
 pub mod pipeline;
 pub mod observability;
+pub mod registry;
 
 // Re-export commonly used types
 pub use sms_core::domain::RawData;

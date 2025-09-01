@@ -29,5 +29,11 @@
     "pii_action": "allow" 
   },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:venuepilot_graphql_v1"
+  "parse_plan_ref": "parse_plan:venuepilot_graphql_v1",
+  "pipeline": {
+    "parser_id": "venuepilot_graphql_v1",
+    "normalizer_id": "conor_byrne",
+    "content_type": "application/json",
+    "parser_type": "graphql"
+  }
 }

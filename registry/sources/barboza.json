@@ -29,5 +29,11 @@
     "pii_action": "allow" 
   },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:barboza_html_v1"
+  "parse_plan_ref": "parse_plan:barboza_html_v1",
+  "pipeline": {
+    "parser_id": "barboza_html_v1",
+    "normalizer_id": "barboza",
+    "content_type": "text/html", 
+    "parser_type": "html_scraper"
+  }
 }

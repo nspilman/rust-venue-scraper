@@ -157,8 +157,28 @@ impl Storage for InMemoryStorage {
             .collect();
 
         // Sort by event_day for consistent processing order
-        raw_data.sort_by_key(|r| r.event_day);
+        raw_data.sort_by(|a, b| a.event_day.cmp(&b.event_day));
+        Ok(raw_data)
+    }
 
+    async fn get_processed_raw_data(
+        &self,
+        api_name: &str,
+        min_date: Option<NaiveDate>,
+    ) -> Result<Vec<RawData>> {
+        let raw_data_map = self.raw_data.lock().unwrap();
+        let mut raw_data: Vec<RawData> = raw_data_map
+            .values()
+            .filter(|r| {
+                r.api_name == api_name
+                    && r.processed
+                    && (min_date.is_none() || r.event_day >= min_date.unwrap())
+            })
+            .cloned()
+            .collect();
+
+        // Sort by event_day for consistent processing order
+        raw_data.sort_by(|a, b| a.event_day.cmp(&b.event_day));
         Ok(raw_data)
     }
 

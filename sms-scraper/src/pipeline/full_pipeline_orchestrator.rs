@@ -1,10 +1,10 @@
 use anyhow::Result;
 use std::sync::Arc;
 use tracing::{info, error, debug};
-use uuid::Uuid;
-use sms_core::domain::{RawData, Venue, Artist, Event};
 use sms_core::storage::{Storage, DatabaseStorage};
-use sms_core::common::types::{RawDataInfo, EventArgs};
+use sms_core::domain::{RawData, Event, Venue, Artist};
+use crate::registry::source_loader::SourceRegistry;
+use crate::pipeline::steps::PipelineStep;
 
 /// Orchestrator for running the complete data processing pipeline
 /// 
@@ -12,13 +12,15 @@ use sms_core::common::types::{RawDataInfo, EventArgs};
 /// Currently handles the transition from raw ingested data to processed entities.
 pub struct FullPipelineOrchestrator {
     storage: Arc<dyn Storage>,
+    source_registry: SourceRegistry,
 }
 
 impl FullPipelineOrchestrator {
     /// Create a new pipeline orchestrator
     pub async fn new() -> Result<Self> {
         let storage = Arc::new(DatabaseStorage::new().await?);
-        Ok(Self { storage })
+        let source_registry = SourceRegistry::load_from_directory("registry/sources")?;
+        Ok(Self { storage, source_registry })
     }
 
     /// Process all unprocessed raw data for a given source through the complete pipeline
@@ -269,13 +271,22 @@ impl FullPipelineOrchestrator {
     }
     
     /// Enrich data with additional context
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/enrich.rs
     async fn enrich_data(&self, normalized: &NormalizedEventData) -> Result<EnrichedEventData> {
-        // Add enrichment like geocoding, categorization, etc.
+        // Placeholder implementation - real enrichment is now handled by EnrichStep
         Ok(EnrichedEventData {
             normalized_data: normalized.clone(),
-            city: "Seattle".to_string(), // Could be derived from venue
-            neighborhood: None, // Could be geocoded
-            categories: Vec::new(), // Could be inferred from title/description
+            location_info: None,
+            artist_info: vec![],
+            event_metadata: EventMetadata {
+                ticket_price: None,
+                age_restriction: Some("21+".to_string()),
+                door_time: None,
+                show_time: None,
+                description: None,
+                external_links: vec![],
+            },
+            categories: vec!["Music".to_string()],
         })
     }
     
@@ -580,49 +591,81 @@ impl FullPipelineOrchestrator {
     }
 
     /// Run ingestion for a specific source to fetch fresh raw data
-    async fn run_ingestion_for_source(&self, source_id: &str) -> Result<()> {
-        info!("🔄 Running ingestion for source: {}", source_id);
-        
-        // Create the appropriate crawler for this source
-        let crawler = crate::apis::factory::create_crawler(source_id)
-            .ok_or_else(|| anyhow::anyhow!("Unknown crawler for source: {}", source_id))?;
-        
-        // Fetch raw event data from the source
-        let raw_event_data = crawler.get_event_list().await?;
-        
-        info!("📥 Fetched {} raw event items from {}", raw_event_data.len(), source_id);
-        
-        // Convert raw event data to RawData entities and store them
-        let internal_api_name = crate::common::constants::api_name_to_internal(source_id);
-        
-        for event_data in raw_event_data {
-            // Extract raw data info for storage
-            let raw_data_info = crawler.get_raw_data_info(&event_data)?;
-            
-            // Create RawData entity
-            let mut raw_data = sms_core::domain::RawData {
-                id: None,
-                event_api_id: raw_data_info.event_api_id,
-                event_name: raw_data_info.event_name,
-                venue_name: raw_data_info.venue_name,
-                event_day: raw_data_info.event_day,
-                api_name: internal_api_name.clone(),
-                data: event_data,
-                processed: false,
-                event_id: None, // Will be set when event is created during processing
-                created_at: chrono::Utc::now(),
-            };
-            
-            // Store the raw data
-            self.storage.create_raw_data(&mut raw_data).await?;
-        }
-        
-        info!("✅ Ingestion completed for {}", source_id);
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/ingestion.rs
+    pub async fn run_ingestion_for_source(&self, source_id: &str) -> Result<()> {
+        let ingestion_step = crate::pipeline::steps::IngestionStep::new(self.source_registry.clone());
+        let result = ingestion_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
         Ok(())
     }
+
+    /// Run parse step independently on raw data from database
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/parse.rs
+    pub async fn run_parse_for_source(&self, source_id: &str) -> Result<()> {
+        let parse_step = crate::pipeline::steps::ParseStep::new(self.source_registry.clone());
+        let result = parse_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    /// Run normalize step independently on parsed data
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/normalize.rs
+    pub async fn run_normalize_for_source(&self, source_id: &str) -> Result<()> {
+        let normalize_step = crate::pipeline::steps::NormalizeStep::new()?;
+        let result = normalize_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    /// Run quality gate step independently on normalized data
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/quality_gate.rs
+    pub async fn run_quality_gate_for_source(&self, source_id: &str) -> Result<()> {
+        let quality_gate_step = crate::pipeline::steps::QualityGateStep::new(0.8);
+        let result = quality_gate_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    /// Run enrich step independently on quality-gated data
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/enrich.rs
+    pub async fn run_enrich_for_source(&self, source_id: &str) -> Result<()> {
+        let enrich_step = crate::pipeline::steps::EnrichStep::new();
+        let result = enrich_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    /// Run conflation step independently on enriched data
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/conflation.rs
+    pub async fn run_conflation_for_source(&self, source_id: &str, confidence_threshold: f64) -> Result<()> {
+        let conflation_step = crate::pipeline::steps::ConflationStep::new(confidence_threshold);
+        let result = conflation_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    /// Run catalog step independently on conflated data
+    /// DEPRECATED: Use the new modular pipeline architecture in steps/catalog.rs
+    pub async fn run_catalog_for_source(&self, source_id: &str, validate_graph: bool) -> Result<()> {
+        let catalog_step = crate::pipeline::steps::CatalogStep::new(validate_graph);
+        let result = catalog_step.execute(source_id, &*self.storage).await?;
+        info!("✅ {}", result.message);
+        Ok(())
+    }
+
+    // NOTE: Utility methods have been moved to pipeline/utils.rs
+    // Individual pipeline steps now handle their own processing logic
+
+    // All utility methods have been moved to pipeline/utils.rs and are used by the modular pipeline steps
 }
 
-/// Data structures for pipeline stages
+// Data structures have been moved to pipeline/utils.rs for shared use
+// Re-export them here for backward compatibility
+pub use crate::pipeline::utils::{QualityResult, CatalogEntry, LocationInfo};
+use sms_core::common::types::{RawDataInfo, EventArgs};
+use uuid::Uuid;
+
+/// Data structures for pipeline stages - kept here for backward compatibility
 #[derive(Debug, Clone)]
 pub struct ParsedEventData {
     pub raw_data_info: RawDataInfo,
@@ -645,9 +688,31 @@ pub struct NormalizedEventData {
 #[derive(Debug, Clone)]
 pub struct EnrichedEventData {
     pub normalized_data: NormalizedEventData,
-    pub city: String,
-    pub neighborhood: Option<String>,
+    pub location_info: Option<LocationInfo>,
+    pub artist_info: Vec<ArtistInfo>,
+    pub event_metadata: EventMetadata,
     pub categories: Vec<String>,
+}
+
+/// Artist information
+#[derive(Debug, Clone)]
+pub struct ArtistInfo {
+    pub name: String,
+    pub genre: Option<String>,
+    pub description: Option<String>,
+    pub website: Option<String>,
+    pub social_links: Vec<String>,
+}
+
+/// Event metadata
+#[derive(Debug, Clone)]
+pub struct EventMetadata {
+    pub ticket_price: Option<String>,
+    pub age_restriction: Option<String>,
+    pub door_time: Option<String>,
+    pub show_time: Option<String>,
+    pub description: Option<String>,
+    pub external_links: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -657,11 +722,6 @@ pub struct ConflatedEventData {
     pub resolved_artist_ids: Vec<Uuid>,
 }
 
-#[derive(Debug)]
-pub struct QualityResult {
-    pub passed: bool,
-    pub reason: String,
-}
 
 /// Result of processing a source through the full pipeline
 #[derive(Debug)]

@@ -29,5 +29,11 @@
     "pii_action": "allow" 
   },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:dice_api_v1"
+  "parse_plan_ref": "parse_plan:dice_api_v1",
+  "pipeline": {
+    "parser_id": "dice_api_v1", 
+    "normalizer_id": "sunset_tavern",
+    "content_type": "application/json",
+    "parser_type": "json_api"
+  }
 }

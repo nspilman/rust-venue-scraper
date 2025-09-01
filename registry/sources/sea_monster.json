@@ -8,6 +8,12 @@
   "content": { "allowed_mime_types": ["text/html"], "max_payload_size_bytes": 20000000 },
   "policy": { "license_id": "terms-unknown", "robots_tos_posture": "respect", "pii_risk_class": "low", "pii_action": "allow" },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:wix_warmup_v1"
+  "parse_plan_ref": "parse_plan:wix_warmup_v1",
+  "pipeline": {
+    "parser_id": "wix_warmup_v1",
+    "normalizer_id": "sea_monster",
+    "content_type": "application/json",
+    "parser_type": "wix_calendar"
+  }
 }
 

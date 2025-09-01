@@ -29,5 +29,11 @@
     "pii_action": "allow" 
   },
   "change_detection": { "strategy": "snapshot" },
-  "parse_plan_ref": "parse_plan:neumos_html_v1"
+  "parse_plan_ref": "parse_plan:neumos_html_v1",
+  "pipeline": {
+    "parser_id": "neumos_html_v1",
+    "normalizer_id": "neumos", 
+    "content_type": "text/html",
+    "parser_type": "html_scraper"
+  }
 }

@@ -16,6 +16,8 @@ use std::sync::Arc;
 use tracing::{debug, info};
 #[cfg(feature = "db")]
 use uuid::Uuid;
+#[cfg(feature = "db")]
+use libsql::Value;
 
 /// Database storage implementation using Turso/libSQL with nodes and edges schema
 #[cfg(feature = "db")]
@@ -449,32 +451,58 @@ impl Storage for DatabaseStorage {
         Ok(filtered_data)
     }
 
-    async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()> {
-        // Get the current raw data
-        if let Some((id, _label, data)) = self
+    async fn get_processed_raw_data(
+        &self,
+        api_name: &str,
+        min_date: Option<NaiveDate>,
+    ) -> Result<Vec<RawData>> {
+        let raw_data_nodes = self
             .db
-            .get_node(&raw_data_id.to_string())
+            .get_nodes_by_label("raw_data")
             .await
             .map_err(|e| ScraperError::Database {
+                message: format!("Failed to query raw data: {e}"),
+            })?;
+
+        let mut filtered_data = Vec::new();
+        for (id, _label, data) in raw_data_nodes.into_iter() {
+            let raw_data = Self::node_data_to_raw_data(&id, &data)?;
+
+            if raw_data.api_name == api_name
+                && raw_data.processed
+                && (min_date.is_none() || raw_data.event_day >= min_date.unwrap())
+            {
+                filtered_data.push(raw_data);
+            }
+        }
+
+        // Sort by event_day to process chronologically
+        filtered_data.sort_by(|a, b| a.event_day.cmp(&b.event_day));
+        Ok(filtered_data)
+    }
+
+    async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()> {
+        // Get the existing raw data node
+        if let Some((_id, _label, data)) = self.db.get_node(&raw_data_id.to_string()).await
+            .map_err(|e| ScraperError::Database {
                 message: format!("Failed to get raw data node: {e}"),
-            })?
+            })? 
         {
-            let mut raw_data = Self::node_data_to_raw_data(&id, &data)?;
+            // Parse the existing data and update the processed flag
+            let mut raw_data = Self::node_data_to_raw_data(&raw_data_id.to_string(), &data)?;
             raw_data.processed = true;
-
+            
+            // Convert back to node data and update
             let updated_data = Self::raw_data_to_node_data(&raw_data)?;
-
-            // Update the node with processed flag
             self.db
                 .create_node(&raw_data_id.to_string(), "raw_data", &updated_data)
                 .await
                 .map_err(|e| ScraperError::Database {
                     message: format!("Failed to update raw data node: {e}"),
                 })?;
-
+                
             debug!("Marked raw data {} as processed", raw_data_id);
         }
-
         Ok(())
     }
 

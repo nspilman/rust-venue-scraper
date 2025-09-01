@@ -12,8 +12,26 @@ This is a Rust-based event data scraper for the Seattle Music Scene (SMS) projec
 - **Pipeline**: Orchestrates the data flow from raw ingestion to processed output
 - **EventApi Trait**: Common interface for all data sources (APIs and web crawlers)
 - **Storage**: Abstraction layer for data persistence (dual-mode: in-memory + Turso/libSQL)
-- **Processing**: Complete ETL pipeline: Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
+- **Processing**: Complete ETL pipeline following the Platonic Ideal: Sources → Ingestion Gateway → Ingest Log → Parse → Normalize → Quality Gate → Enrich → Conflation → Catalog
 - **Domain**: Core data structures and models (Venue, Artist, Event, RawData)
+
+### Pipeline Architecture (Platonic Ideal Implementation)
+The system implements a 9-step ETL pipeline with clear separation of concerns. Each step has dedicated documentation:
+
+**Steps 1-3: Ingestion** (`src/pipeline/ingestion/`)
+- **Sources & Registry**: Policy-driven data source management
+- **Ingestion Gateway**: Safe doorway with deduplication and immutable storage  
+- **Ingest Log**: Reliable, replayable envelope stream
+
+**Steps 4-9: Processing** (`src/pipeline/processing/`)
+- **Parse**: Raw bytes → neutral records with provenance
+- **Normalize**: Canonical geospatial shape and consistent taxonomies
+- **Quality Gate**: Accept/warn/quarantine with clear criteria  
+- **Enrich**: Add spatial bins, city tags, contextual metadata
+- **Conflation**: Entity resolution and relationship building
+- **Catalog**: Final graph storage as Nodes/Edges with time/provenance
+
+See individual README.md files in each pipeline directory for detailed separation of concerns and implementation guidelines.
 
 ### Implemented Data Sources
 **Web Crawlers:**

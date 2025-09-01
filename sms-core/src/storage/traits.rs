@@ -35,6 +35,11 @@ pub trait Storage: Send + Sync {
         api_name: &str,
         min_date: Option<NaiveDate>
     ) -> Result<Vec<RawData>>;
+    async fn get_processed_raw_data(
+        &self,
+        api_name: &str,
+        min_date: Option<NaiveDate>
+    ) -> Result<Vec<RawData>>;
     async fn mark_raw_data_processed(&self, raw_data_id: Uuid) -> Result<()>;
     
     // Processing operations
